@@ -2,9 +2,9 @@
 
 This is an interactive 3D graph of all possible positions in the standard Klotski puzzle.
 
-Features:
+You can:
 - Fly around freely!
-- Trace your path on the graph!
+- Trace your path on the graph as you play the puzzle!
 - Find shortest route between any two positions!
 
 Made with assistance from Google Gemini.
