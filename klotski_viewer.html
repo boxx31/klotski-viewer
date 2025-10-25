@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klotski Viewer</title>
+    <style>
+        html, body { margin: 0; padding: 0; overflow: hidden; }
+        body { background-color: #111; color: #fff; font-family: sans-serif; }
+        canvas { display: block; }
+        
+        #highlight-ring {
+            position: absolute;
+            width: 20px;  
+            height: 20px; 
+            border: 2px solid magenta; 
+            border-radius: 50%; 
+            pointer-events: none; 
+            display: none; 
+            transform: translate(-50%, -50%); 
+            z-index: 100;
+        }
+
+        #klotski-board-container {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            width: 160px;
+            height: 200px;
+            background-color: #222;
+            border: 2px solid #888;
+            border-radius: 4px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(5, 1fr);
+            z-index: 10;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            cursor: pointer; /* NEW: Indicate it's interactive */
+        }
+        .klotski-cell {
+            width: 100%;
+            height: 100%;
+            border: 1px solid #444;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.6);
+            user-select: none;
+            transition: background-color 0.1s;
+        }
+        
+        /* NEW: Style for the selected piece */
+        .klotski-cell.selected {
+            outline: 2px solid magenta;
+            outline-offset: -2px;
+            box-shadow: inset 0 0 10px rgba(255, 0, 255, 0.5);
+        }
+
+        #controls {
+            position: absolute;
+            top: 15px;
+            right: 15px; 
+            z-index: 10;
+            background-color: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 8px;
+            min-width: 180px;
+        }
+        #controls label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        #controls input[type="file"] {
+            margin-bottom: 10px;
+            font-size: 0.8em;
+        }
+        #controls input[type="range"] {
+            width: 110px;
+            vertical-align: middle;
+        }
+        #controls span {
+            vertical-align: middle;
+            margin-left: 5px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        #controls button {
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 8px 12px;
+            margin: 4px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            width: 80px;
+            box-sizing: border-box;
+        }
+        #controls button:hover {
+            background-color: #555;
+        }
+        #controls button.active {
+            background-color: #00aaff;
+            border-color: #00aaff;
+            font-weight: bold;
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            z-index: 10;
+            background-color: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            line-height: 1.5;
+            color: #eee;
+        }
+        #instructions code {
+            background-color: #222;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        #node-info {
+            position: absolute;
+            bottom: 15px;  /* MODIFIED: Align with instructions */
+            right: 15px;   /* MODIFIED: Move to right side */
+            left: auto;    /* MODIFIED: Unset left position */
+            z-index: 10;
+            background-color: rgba(0,0,0,0.5);
+            padding: 8px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 1.1em;
+            color: #fff;
+            display: none; /* Hide by default */
+        }
+    </style>
+</head>
+<body>
+    <div id="highlight-ring"></div>
+    <div id="klotski-board-container"></div>
+    <div id="node-info"></div>
+    
+    <div id="instructions">
+        <b>Controls:</b><br>
+        1. <b>Click Screen</b> to lock mouse & fly.<br>
+        2. Use <code>WASD</code> + <code>Mouse</code> to fly.<br>
+        3. <code>Space</code> = Up, <code>Shift</code> = Down.<br>
+        4. Press <code>ESC</code> to unlock mouse.<br>
+        5. <code>Ctrl+Click</code> a node (while unlocked).<br>
+        6. <b>Click piece + empty spot</b> on board to move.
+    </div>
+
+    <div id="controls">
+        <label for="speedSlider">Flight Speed:</label>
+        <input type="range" id="speedSlider" min="50" max="4000" value="4000" step="50">
+        <span id="speedValue">4000</span>
+        <hr style="border-color: #444; margin: 10px 0;">
+        
+        <strong>Node Color:</strong><br>
+        <button id="btnOff" class="active">Default</button>
+        <button id="btnDist">Start</button>
+        <button id="btnSolutionDist">Solution</button>
+
+        <hr style="border-color: #444; margin: 10px 0;">
+        <strong>Position:</strong>
+        <input type="text" id="current-pos-input" readonly style="width: 170px; background: #222; color: #ccc; border: 1px solid #555; font-family: monospace; font-size: 0.9em; padding: 4px; box-sizing: border-box; margin-top: 5px;">
+        
+        <div style="margin-top: 8px;">
+            <input type="text" id="teleport-input" placeholder="Enter 20-char position..." style="width: 170px; background: #333; color: #fff; border: 1px solid #555; font-family: monospace; font-size: 0.9em; padding: 4px; box-sizing: border-box;">
+            <button id="btn-teleport" style="width: auto; padding: 8px 10px; margin-top: 4px;">Teleport</button>
+        </div>
+
+        <hr style="border-color: #444; margin: 10px 0;">
+        <strong>Shortest Path:</strong>
+        <div style="margin-bottom: 5px;">
+            <input type="checkbox" id="traceToggle" checked>
+            <label for="traceToggle" style="font-size: 0.9em; user-select: none; cursor: pointer;">Trace Path on Board</label>
+        </div>
+        <div id="path-info" style="font-family: monospace; margin: 5px 0; min-height: 40px; background: #222; padding: 5px; border-radius: 4px;">
+            Start: (None)<br>End: (None)
+        </div>
+        <button id="btnSetPathStart" style="width: auto; padding: 8px 10px;">Set Highlighted as Start</button>
+        <button id="btnSetPathEnd" style="width: auto; padding: 8px 10px;">Set Highlighted as End</button>
+        <button id="btnCalcPath" style="width: auto; padding: 8px 10px;">Find Path</button>
+        <button id="btnFindSolutionPath" style="width: auto; padding: 8px 10px;">Find Path to Solution</button>
+
+        
+    </div>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        // --- Standard Three.js Setup ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x111111);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1.0, 25000);
+        camera.up.set(0, 1, 0); 
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        const controls = new PointerLockControls(camera, renderer.domElement);
+
+        // --- Game Controls Setup ---
+        const clock = new THREE.Clock();
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, moveUp = false, moveDown = false;
+        let moveSpeed = 4000.0; 
+        
+        const onKeyDown = (event) => {
+            switch (event.code) {
+                case 'KeyW': moveForward = true; break;
+                case 'KeyA': moveLeft = true; break;
+                case 'KeyS': moveBackward = true; break;
+                case 'KeyD': moveRight = true; break;
+                case 'Space': moveUp = true; event.preventDefault(); break;
+                case 'ShiftLeft': moveDown = true; break;
+            }
+        };
+        const onKeyUp = (event) => {
+            switch (event.code) {
+                case 'KeyW': moveForward = false; break;
+                case 'KeyA': moveLeft = false; break;
+                case 'KeyS': moveBackward = false; break;
+                case 'KeyD': moveRight = false; break;
+                case 'Space': moveUp = false; break;
+                case 'ShiftLeft': moveDown = false; break;
+            }
+        };
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
+        renderer.domElement.addEventListener('click', (event) => {
+            if (!event.ctrlKey) {
+                controls.lock();
+            }
+        });
+        
+        // --- Core Graph/Interaction Variables ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let nodesArray = []; 
+        let nodes = null; 
+        let nodeGeometry = null; 
+        let highlightRingEl = null; 
+        let highlightedPosition = null; 
+        const tempVector = new THREE.Vector3(); 
+        const colorAttributes = {}; 
+        let activeColorAttributeName = 'default'; 
+        let nodeInfoEl = null;
+
+        // --- Position/Teleport State ---
+        let currentPosEl = null;
+        let teleportInputEl = null;
+
+        // --- Path Tracing State ---
+        let tracedPathNodeIds = [];
+        let isPathTracerOn = true;
+
+        // --- Shortest Path State ---
+        let pathStartNode = null;
+        let pathEndNode = null;
+        let pathInfoEl = null;
+        let pathHighlightMesh = null;
+
+        // --- Klotski Game State ---
+        let graphData = null; // To store the full loaded graph
+        let currentBoard = []; // 20-char array of the current board state
+        let selectedCellIndex = -1; // Index (0-19) of the first cell clicked
+        let highlightedNodeData = null; // The full data object for the selected node
+        const klotskiBoardEl = document.getElementById('klotski-board-container');
+        const klotskiCells = [];
+        const pieceColors = {
+            '.': '#333', 'a': '#FF6347', 'b': '#4682B4', 'c': '#32CD32', 'd': '#FFD700',
+            'e': '#6A5ACD', 'f': '#DAA520', 'g': '#20B2AA', 'h': '#FF69B4', 'i': '#8A2BE2', 'j': '#A52A2A'
+        };
+
+        // --- Helper: Color Scale Helper Function ---
+        function mapValueToColor(value, min, max) {
+            const color = new THREE.Color();
+            if (min === max) { color.setHSL(0.66, 1.0, 0.5); return color; }
+            const normalized = (value - min) / (max - min);
+            const hue = 0.66 - (normalized * 0.66);
+            color.setHSL(hue, 1.0, 0.5);
+            return color;
+        }
+
+        // --- Klotski Board Setup ---
+        for (let i = 0; i < 20; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('klotski-cell');
+            // NEW: Add click listener for game logic
+            cell.addEventListener('click', () => onKlotskiCellClick(i));
+            klotskiBoardEl.appendChild(cell);
+            klotskiCells.push(cell);
+        }
+        
+        /**
+         * Updates the Klotski board display AND the internal game state.
+         * @param {string} representation - The 20-character string.
+         */
+        function updateKlotskiBoard(representation) {
+            if (!representation || representation.length !== 20) {
+                representation = "...................."; // Default to empty
+            }
+            
+            currentBoard = representation.split('');
+            
+            for (let i = 0; i < 20; i++) {
+                const char = currentBoard[i];
+                klotskiCells[i].style.backgroundColor = pieceColors[char] || '#CCC';
+                klotskiCells[i].textContent = char === '.' ? '' : char;
+                klotskiCells[i].classList.remove('selected'); // Clear all selections
+            }
+            selectedCellIndex = -1; // Reset selection
+        }
+        updateKlotskiBoard("...................."); // Initialize
+
+        function updateNodeInfoLabel() {
+            if (!nodeInfoEl) return; // Not loaded yet
+
+            if (!highlightedNodeData) {
+                nodeInfoEl.style.display = 'none'; // Hide if no node is selected
+                return;
+            }
+
+            // Check the active mode and update text content
+            if (activeColorAttributeName === 'dist') {
+                nodeInfoEl.style.display = 'block';
+                nodeInfoEl.textContent = `Start Dist: ${highlightedNodeData.dist}`;
+            } else if (activeColorAttributeName === 'solution') {
+                nodeInfoEl.style.display = 'block';
+                nodeInfoEl.textContent = `Solution Dist: ${highlightedNodeData.solution_dist}`;
+            } else {
+                // Hide in 'Default' mode
+                nodeInfoEl.style.display = 'none'; 
+            }
+        }
+
+        function selectNode(nodeData) {
+            if (!nodeData) {
+                // Clear selection
+                highlightedNodeData = null;
+                highlightedPosition = null;
+                updateKlotskiBoard("....................");
+                if (currentPosEl) currentPosEl.value = "....................";
+            } else {
+                highlightedNodeData = nodeData;
+                highlightedPosition = new THREE.Vector3(nodeData.x, -nodeData.y, -nodeData.z);
+                updateKlotskiBoard(nodeData.representation);
+                if (currentPosEl) currentPosEl.value = nodeData.representation;
+            }
+            updateNodeInfoLabel();
+        }
+
+        function updatePathInfoLabel() {
+            if (!pathInfoEl) return;
+            const startText = pathStartNode ? pathStartNode.id : "(None)";
+            const endText = pathEndNode ? pathEndNode.id : "(None)";
+            pathInfoEl.innerHTML = `Start: ${startText}<br>End: ${endText}`;
+        }
+
+        function onMouseDown(event) {
+            if (controls.isLocked || !event.ctrlKey) {
+                return;
+            }
+            if (!nodes || nodesArray.length === 0) {
+                return;
+            }
+            event.preventDefault();
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            
+            raycaster.params.Points.threshold = 100.0; 
+            
+            const intersects = raycaster.intersectObject(nodes);
+
+            if (intersects.length > 0) {
+                intersects.sort((a, b) => a.distanceToRay - b.distanceToRay);
+                const index = intersects[0].index;
+                const nodeData = nodesArray[index];
+                
+                if (nodeData) {
+                    selectNode(nodeData);
+                    // Path tracing logic removed from here
+                }
+            } else {
+                selectNode(null); 
+                // Path tracing logic removed from here
+            }
+        }
+        window.addEventListener('mousedown', onMouseDown, false);
+        
+        
+        const PIECE_TYPE_1x1 = new Set(['f', 'g', 'i', 'j']);
+        const PIECE_TYPE_1x2 = new Set(['a', 'c', 'e', 'h']);
+        const PIECE_TYPE_2x1 = new Set(['d']);
+        // 'b' (2x2) is its own unique type.
+
+        /**
+         * Helper function for the canonicalizer.
+         * Modifies the array in-place, replacing all pieces of a given type
+         * with a sorted list of those same pieces.
+         * @param {string[]} repArray - The board array (being modified).
+         * @param {Set<string>} pieceTypeSet - The set of pieces to canonicalize (e.g., PIECE_TYPE_1x1).
+         */
+        function sortPiecesInArray(repArray, pieceTypeSet) {
+            // 1. Find and sort all pieces of this type
+            const pieces = repArray
+                .filter(char => pieceTypeSet.has(char))
+                .sort();
+                
+            if (pieces.length === 0) {
+                return; // No pieces of this type, do nothing
+            }
+
+            // 2. Re-iterate over the array, replacing pieces in sorted order
+            let pieceIndex = 0;
+            for (let i = 0; i < repArray.length; i++) {
+                if (pieceTypeSet.has(repArray[i])) {
+                    repArray[i] = pieces[pieceIndex++];
+                }
+            }
+        }
+
+        /**
+         * Canonicalizes a representation string by sorting all permutable pieces
+         * (1x1, 1x2, 2x1) among themselves.
+         * @param {string} repString - The 20-char representation string.
+         * @returns {string} The canonical representation.
+         */
+        function canonicalize(repString) {
+            const repArray = repString.split('');
+            
+            // Canonicalize each permutable piece type independently
+            sortPiecesInArray(repArray, PIECE_TYPE_1x1);
+            sortPiecesInArray(repArray, PIECE_TYPE_1x2);
+            sortPiecesInArray(repArray, PIECE_TYPE_2x1);
+            
+            return repArray.join('');
+        }
+        
+        /**
+         * Handles a click on the Klotski board grid.
+         */
+        function onKlotskiCellClick(clickedIndex) {
+            if (!highlightedNodeData) return; // Can't play if no node is selected
+
+            const clickedChar = currentBoard[clickedIndex];
+            
+            if (selectedCellIndex === -1) {
+                // 1. FIRST CLICK: Select a piece
+                if (clickedChar === '.') return; // Can't select an empty space
+                
+                selectedCellIndex = clickedIndex;
+                klotskiCells[clickedIndex].classList.add('selected');
+                
+            } else {
+                // 2. SECOND CLICK: Select a destination
+                
+                if (selectedCellIndex === clickedIndex) {
+                    klotskiCells[clickedIndex].classList.remove('selected');
+                    selectedCellIndex = -1;
+                    return;
+                }
+                
+                if (clickedChar !== '.') {
+                    klotskiCells[selectedCellIndex].classList.remove('selected');
+                    selectedCellIndex = clickedIndex;
+                    klotskiCells[clickedIndex].classList.add('selected');
+                    return;
+                }
+                
+                const pieceChar = currentBoard[selectedCellIndex];
+                const fromX = selectedCellIndex % 4;
+                const fromY = Math.floor(selectedCellIndex / 4);
+                const toX = clickedIndex % 4;
+                const toY = Math.floor(clickedIndex / 4);
+                
+                const dx = toX - fromX;
+                const dy = toY - fromY;
+
+                if (Math.abs(dx) + Math.abs(dy) !== 1) {
+                    klotskiCells[selectedCellIndex].classList.remove('selected');
+                    selectedCellIndex = -1;
+                    return;
+                }
+
+                const [moveSuccess, newBoard] = attemptMove(pieceChar, dx, dy);
+                
+                if (moveSuccess) {
+                    const newRep = newBoard.join('');
+                    const neighborNode = findNeighborByRep(newRep); 
+                    
+                    if (neighborNode) {
+                        if (isPathTracerOn) { 
+                            const currentPath = tracedPathNodeIds;
+                            const currentNodeId = highlightedNodeData.id;
+                            const nextNodeId = neighborNode.id;
+
+                            if (currentPath.length === 0) {
+                                tracedPathNodeIds = [currentNodeId, nextNodeId];
+                            } else if (currentPath[currentPath.length - 1] === currentNodeId) {
+                                tracedPathNodeIds.push(nextNodeId);
+                            } else {
+                                tracedPathNodeIds = [currentNodeId, nextNodeId];
+                            }
+                            highlightPath(tracedPathNodeIds);
+                        }
+
+                        selectNode(neighborNode); 
+
+                    } else {
+                        console.warn("Valid move, but no neighbor found in graph for rep:", newRep);
+                        klotskiCells[selectedCellIndex].classList.remove('selected');
+                        selectedCellIndex = -1;
+                    }
+                } else {
+                    klotskiCells[selectedCellIndex].classList.remove('selected');
+                    selectedCellIndex = -1;
+                }
+            }
+        }
+
+        /**
+         * Tries to move a piece, returns new board state if successful.
+         * (This function is unchanged but must be present)
+         */
+        function attemptMove(pieceChar, dx, dy) {
+            const board = [...currentBoard]; // Create a copy
+            const pieceIndices = [];
+            for (let i = 0; i < 20; i++) {
+                if (board[i] === pieceChar) {
+                    pieceIndices.push(i);
+                }
+            }
+            
+            const newPieceIndices = [];
+            
+            for (const index of pieceIndices) {
+                const x = index % 4;
+                const y = Math.floor(index / 4);
+                
+                const newX = x + dx;
+                const newY = y + dy;
+                
+                if (newX < 0 || newX > 3 || newY < 0 || newY > 4) {
+                    return [false, null];
+                }
+                
+                const newIndex = newY * 4 + newX;
+                
+                if (board[newIndex] !== '.' && board[newIndex] !== pieceChar) {
+                    return [false, null];
+                }
+                
+                newPieceIndices.push(newIndex);
+            }
+            
+            const newBoard = [...board]; // Create a new copy to modify
+            for (const index of pieceIndices) {
+                newBoard[index] = '.';
+            }
+            for (const index of newPieceIndices) {
+                newBoard[index] = pieceChar;
+            }
+            
+            return [true, newBoard];
+        }
+
+        /**
+         * Finds a neighbor by its *canonical* representation.
+         * (This function is unchanged but must be present)
+         */
+        function findNeighborByRep(representation) {
+            if (!highlightedNodeData || !graphData) return null;
+            
+            const targetCanonicalRep = canonicalize(representation);
+            const neighborIds = new Set(highlightedNodeData.neighbors);
+            
+            for (const neighborId of neighborIds) {
+                const neighborNode = graphData[neighborId];
+                if (neighborNode) {
+                    const neighborCanonicalRep = canonicalize(neighborNode.representation);
+                    if (neighborCanonicalRep === targetCanonicalRep) {
+                        return neighborNode;
+                    }
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Runs a Breadth-First Search (BFS) to find the shortest path.
+         * @param {string} startNodeId - The ID of the starting node.
+         * @param {string} endNodeId - The ID of the target node.
+         * @returns {number} The shortest distance, or -1 if no path is found.
+         */
+        function runBFS(startNodeId, endNodeId) {
+            if (!graphData) return null;
+            
+            const queue = []; // Use array as a queue: [nodeId]
+            // Use a Map to store predecessors (to rebuild the path)
+            const predecessors = new Map();
+
+            queue.push(startNodeId);
+            predecessors.set(startNodeId, null); // Mark start node
+            
+            let head = 0; 
+            
+            while (head < queue.length) {
+                const currentId = queue[head++];
+                
+                // 1. Check if we found the target
+                if (currentId === endNodeId) {
+                    // Reconstruct path
+                    const path = [];
+                    let step = endNodeId;
+                    while (step !== null) { // Backtrack from end to start
+                        path.push(step);
+                        step = predecessors.get(step);
+                    }
+                    return path.reverse(); // Return [start, ..., end]
+                }
+                
+                const currentNode = graphData[currentId];
+                if (!currentNode) continue; 
+
+                // 3. Add all unvisited neighbors to the queue
+                for (const neighborId of new Set(currentNode.neighbors)) {
+                    if (!predecessors.has(neighborId)) { // If not visited
+                        predecessors.set(neighborId, currentId); // Store parent
+                        queue.push(neighborId);
+                    }
+                }
+            }
+            
+            return null; // No path found
+        }
+
+        /**
+         * NEW: Reconstructs the shortest path to a solution node using pre-calculated 'solution_dist'.
+         * @param {object} startNode - The node object to start from.
+         * @returns {string[]|null} The path as an array of node IDs, or null.
+         */
+        function findSolutionPath(startNode) {
+            if (!graphData) return null;
+            
+            const path = [startNode.id];
+            let currentNode = startNode;
+            let currentDist = startNode.solution_dist;
+            
+            // Walk "downhill" from the start node's distance to 0
+            while (currentDist > 0) {
+                const targetDist = currentDist - 1;
+                let foundNextStep = false;
+                
+                // Check all unique neighbors
+                for (const neighborId of new Set(currentNode.neighbors)) {
+                    const neighborNode = graphData[neighborId];
+                    
+                    // If this neighbor is one step closer to the solution, take it
+                    if (neighborNode && neighborNode.solution_dist === targetDist) {
+                        path.push(neighborId);
+                        currentNode = neighborNode;
+                        currentDist = neighborNode.solution_dist;
+                        foundNextStep = true;
+                        break; // Move to the next step in the path
+                    }
+                }
+                
+                if (!foundNextStep) {
+                    // This should not happen if the graph data is correct
+                    console.error("Could not find next step in solution path. Graph inconsistent.");
+                    return null;
+                }
+            }
+            
+            return path; // Path successfully found
+        }
+
+        /**
+         * Highlights a path on the graph by updating the pathHighlightMesh.
+         * @param {string[]|null} path - An array of node IDs, or null to clear.
+         */
+        function highlightPath(path) {
+            if (!pathHighlightMesh || !graphData) return;
+
+            // If path is null or too short, clear the geometry
+            if (path === null || path.length < 2) {
+                pathHighlightMesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+                return;
+            }
+            
+            const positions = [];
+            for (let i = 0; i < path.length - 1; i++) {
+                const nodeA = graphData[path[i]];
+                const nodeB = graphData[path[i+1]];
+                
+                if (nodeA && nodeB) {
+                    // Add line segment (A -> B), using the inverted coordinates
+                    positions.push(nodeA.x, -nodeA.y, -nodeA.z);
+                    positions.push(nodeB.x, -nodeB.y, -nodeB.z);
+                }
+            }
+            
+            // Update the geometry
+            pathHighlightMesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            pathHighlightMesh.geometry.computeBoundingSphere(); // Important update
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        async function loadData() {
+            try {
+                // 1. Fetch the graph data. Assumes "data.json" is in the same folder.
+                const response = await fetch('./data.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status} - Did you name your file 'data.json'?`);
+                }
+                const data = await response.json();
+                
+                // 2. Assign to global variable
+                graphData = data;
+                
+                // 3. Run all setup code that depends on the data
+                console.time('Graph Processing');
+                const nodePositions = [];
+                const edgePositions = [];
+                const nodeColorsDefault = [];
+                const nodeColorsByDist = [];
+                const nodeColorsBySolutionDist = [];
+                const nodeMap = new Map();
+                nodesArray = []; 
+                let minDist = Infinity, maxDist = -Infinity, minSolDist = Infinity, maxSolDist = -Infinity;
+
+                // First pass (rotate graph, find min/max)
+                for (const nodeId in data) {
+                    const node = data[nodeId];
+                    node.id = nodeId; 
+                    nodeMap.set(nodeId, new THREE.Vector3(node.x, -node.y, -node.z));
+                    nodesArray.push(node); 
+                    if (node.dist < minDist) minDist = node.dist;
+                    if (node.dist > maxDist) maxDist = node.dist;
+                    if (node.solution_dist < minSolDist) minSolDist = node.solution_dist;
+                    if (node.solution_dist > maxSolDist) maxSolDist = node.solution_dist;
+                }
+
+                // Second pass (build color/position arrays)
+                const defaultColor = new THREE.Color(0x00aaff);
+                for (const node of nodesArray) {
+                    nodePositions.push(node.x, -node.y, -node.z);
+                    nodeColorsDefault.push(defaultColor.r, defaultColor.g, defaultColor.b);
+                    const distColor = mapValueToColor(node.dist, minDist, maxDist);
+                    nodeColorsByDist.push(distColor.r, distColor.g, distColor.b);
+                    const solDistColor = mapValueToColor(node.solution_dist, minSolDist, maxSolDist);
+                    nodeColorsBySolutionDist.push(solDistColor.r, solDistColor.g, solDistColor.b);
+                }
+
+                // Third pass (build edge array)
+                for (const nodeId in data) {
+                    const sourcePos = nodeMap.get(nodeId); 
+                    for (const neighborId of data[nodeId].neighbors) {
+                        const targetPos = nodeMap.get(neighborId);
+                        if (sourcePos && targetPos) {
+                            edgePositions.push(sourcePos.x, sourcePos.y, sourcePos.z);
+                            edgePositions.push(targetPos.x, targetPos.y, targetPos.z);
+                        }
+                    }
+                }
+                console.timeEnd('Graph Processing');
+                
+                // 4. Create Geometry
+                console.time('Geometry Creation');
+                nodeGeometry = new THREE.BufferGeometry(); 
+                nodeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nodePositions, 3));
+                colorAttributes.default = new THREE.Float32BufferAttribute(nodeColorsDefault, 3);
+                colorAttributes.dist = new THREE.Float32BufferAttribute(nodeColorsByDist, 3);
+                colorAttributes.solution = new THREE.Float32BufferAttribute(nodeColorsBySolutionDist, 3);
+                nodeGeometry.setAttribute('color', colorAttributes.default);
+                const nodeMaterial = new THREE.PointsMaterial({ vertexColors: true, size: 4, sizeAttenuation: true });
+                nodes = new THREE.Points(nodeGeometry, nodeMaterial); 
+                scene.add(nodes);
+
+                const edgeGeometry = new THREE.BufferGeometry();
+                edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
+                const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 });
+                const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+                scene.add(edges);
+                
+                const pathGeo = new THREE.BufferGeometry();
+                const pathMat = new THREE.LineBasicMaterial({ color: 0xFF00FF, transparent: true, opacity: 0.8, depthTest: false });
+                pathHighlightMesh = new THREE.LineSegments(pathGeo, pathMat);
+                pathHighlightMesh.renderOrder = 998;
+                scene.add(pathHighlightMesh);
+                console.timeEnd('Geometry Creation');
+
+                // 5. Get all UI elements
+                highlightRingEl = document.getElementById('highlight-ring');
+                nodeInfoEl = document.getElementById('node-info');
+                pathInfoEl = document.getElementById('path-info');
+                currentPosEl = document.getElementById('current-pos-input');
+                teleportInputEl = document.getElementById('teleport-input');
+                
+                // 6. Position Camera
+                const firstNode = data[Object.keys(data)[0]];
+                if (firstNode) {
+                    camera.position.set(firstNode.x, -firstNode.y, -firstNode.z + 5000); 
+                } else {
+                    camera.position.z = 5;
+                }
+                
+                // 7. Attach ALL button listeners
+                const btnOff = document.getElementById('btnOff');
+                const btnDist = document.getElementById('btnDist');
+                const btnSolutionDist = document.getElementById('btnSolutionDist');
+                const buttons = [btnOff, btnDist, btnSolutionDist];
+                function setActiveButton(activeBtn) {
+                    buttons.forEach(btn => btn.classList.remove('active'));
+                    activeBtn.classList.add('active');
+                }
+                btnOff.addEventListener('click', () => { 
+                    nodeGeometry.setAttribute('color', colorAttributes.default);
+                    nodeGeometry.attributes.color.needsUpdate = true; 
+                    activeColorAttributeName = 'default'; 
+                    setActiveButton(btnOff);
+                    updateNodeInfoLabel();
+                });
+                btnDist.addEventListener('click', () => {
+                    nodeGeometry.setAttribute('color', colorAttributes.dist);
+                    nodeGeometry.attributes.color.needsUpdate = true;
+                    activeColorAttributeName = 'dist'; 
+                    setActiveButton(btnDist);
+                    updateNodeInfoLabel();
+                });
+                btnSolutionDist.addEventListener('click', () => {
+                    nodeGeometry.setAttribute('color', colorAttributes.solution);
+                    nodeGeometry.attributes.color.needsUpdate = true;
+                    activeColorAttributeName = 'solution'; 
+                    setActiveButton(btnSolutionDist);
+                    updateNodeInfoLabel();
+                });
+                
+                const speedSlider = document.getElementById('speedSlider');
+                const speedValueEl = document.getElementById('speedValue');
+                moveSpeed = parseFloat(speedSlider.value);
+                speedValueEl.textContent = moveSpeed;
+                speedSlider.addEventListener('input', () => {
+                    moveSpeed = parseFloat(speedSlider.value);
+                    speedValueEl.textContent = moveSpeed;
+                });
+                
+                document.getElementById('btn-teleport').addEventListener('click', () => {
+                    const targetRep = teleportInputEl.value;
+                    if (targetRep.length !== 20) {
+                        alert("Invalid position string. Must be 20 characters long."); return;
+                    }
+                    const canonicalTarget = canonicalize(targetRep);
+                    const foundNode = nodesArray.find(node => canonicalize(node.representation) === canonicalTarget);
+                    if (foundNode) {
+                        selectNode(foundNode);
+                        camera.position.set(foundNode.x, -foundNode.y, -foundNode.z + 1000);
+                        tracedPathNodeIds = [foundNode.id];
+                        highlightPath(null);
+                    } else {
+                        alert("A node with that position was not found in the graph.");
+                    }
+                });
+
+                document.getElementById('btnFindRemote').addEventListener('click', () => {
+                    let maxDist = -Infinity;
+                    for (const node of nodesArray) {
+                        if (node.dist > maxDist) maxDist = node.dist;
+                    }
+                    const remoteNodes = nodesArray.filter(node => node.dist === maxDist);
+                    alert(`Found ${remoteNodes.length} nodes at max 'Start Distance' of ${maxDist}. Highlighting first one.`);
+                    if (remoteNodes.length > 0) selectNode(remoteNodes[0]);
+                });
+
+                document.getElementById('btnFindPath').addEventListener('click', () => {
+                    const startNode = nodesArray.find(node => node.dist === 0);
+                    if (startNode) {
+                        alert(`Shortest path between Start and Solution is ${startNode.solution_dist} moves. Highlighting Start.`);
+                        selectNode(startNode);
+                    } else {
+                        alert("Could not find the Start node (dist: 0).");
+                    }
+                });
+                
+                document.getElementById('btnSetPathStart').addEventListener('click', () => {
+                    if (highlightedNodeData) {
+                        pathStartNode = highlightedNodeData;
+                        updatePathInfoLabel();
+                    } else {
+                        alert("Please select a node first by Ctrl+Clicking it.");
+                    }
+                });
+
+                document.getElementById('btnSetPathEnd').addEventListener('click', () => {
+                    if (highlightedNodeData) {
+                        pathEndNode = highlightedNodeData;
+                        updatePathInfoLabel();
+                    } else {
+                        alert("Please select a node first by Ctrl+Clicking it.");
+                    }
+                });
+                
+                document.getElementById('btnCalcPath').addEventListener('click', () => {
+                    if (!pathStartNode || !pathEndNode) {
+                        alert("Please set both a Start and an End node first."); return;
+                    }
+                    highlightPath(null);
+                    if (pathStartNode.id === pathEndNode.id) {
+                        alert("Start and End nodes are the same. Distance is 0.");
+                        pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Distance: 0`;
+                        return;
+                    }
+                    pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Calculating...`;
+                    setTimeout(() => {
+                        console.time("BFS Pathfind");
+                        const path = runBFS(pathStartNode.id, pathEndNode.id);
+                        console.timeEnd("BFS Pathfind");
+                        if (path === null) {
+                            pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>No Path Found`;
+                        } else {
+                            const distance = path.length - 1;
+                            pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Distance: ${distance}`;
+                            highlightPath(path);
+                        }
+                    }, 10);
+                });
+                
+                document.getElementById('btnFindSolutionPath').addEventListener('click', () => {
+                    if (!highlightedNodeData) {
+                        alert("Please select a node first by Ctrl+Clicking it."); return;
+                    }
+                    if (highlightedNodeData.solution_dist === 0) {
+                        alert("This is already a solution node.");
+                        highlightPath(null);
+                        return;
+                    }
+                    highlightPath(null);
+                    console.time("Solution Pathfind");
+                    const path = findSolutionPath(highlightedNodeData);
+                    console.timeEnd("Solution Pathfind");
+                    if (path) {
+                        highlightPath(path);
+                        alert(`Path to nearest solution found (${path.length - 1} moves).`);
+                    } else {
+                        alert("Could not reconstruct path to solution.");
+                    }
+                });
+
+                document.getElementById('traceToggle').addEventListener('change', (event) => {
+                    isPathTracerOn = event.target.checked;
+                });
+
+            } catch (error) {
+                console.error('Failed to load or process graph data:', error);
+                alert('CRITICAL ERROR: Could not load graph.json. Check console (F12) for details.');
+            }
+        }
+        
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            if (controls.isLocked === true) {
+                const moveAmount = moveSpeed * delta;
+                if (moveForward) controls.moveForward(moveAmount);
+                if (moveBackward) controls.moveForward(-moveAmount);
+                if (moveLeft) controls.moveRight(-moveAmount);
+                if (moveRight) controls.moveRight(moveAmount);
+                if (moveUp) camera.position.y += moveAmount; 
+                if (moveDown) camera.position.y -= moveAmount;
+            }
+
+            if (highlightRingEl) {
+                if (highlightedPosition) {
+                    tempVector.copy(highlightedPosition);
+                    tempVector.project(camera);
+                    if (tempVector.z > 1) {
+                        highlightRingEl.style.display = 'none';
+                    } else {
+                        const x = (tempVector.x * 0.5 + 0.5) * window.innerWidth;
+                        const y = (tempVector.y * -0.5 + 0.5) * window.innerHeight;
+                        highlightRingEl.style.display = 'block';
+                        highlightRingEl.style.left = `${x}px`;
+                        highlightRingEl.style.top = `${y}px`;
+                    }
+                } else {
+                    highlightRingEl.style.display = 'none';
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // --- Start Everything ---
+        loadData();
+        animate();
+
+    </script>
+</body>
+</html>
