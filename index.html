@@ -175,7 +175,8 @@
         
         <div style="margin-top: 8px;">
             <input type="text" id="teleport-input" placeholder="Enter 20-char position..." style="width: 170px; background: #333; color: #fff; border: 1px solid #555; font-family: monospace; font-size: 0.9em; padding: 4px; box-sizing: border-box;">
-            <button id="btn-teleport" style="width: auto; padding: 8px 10px; margin-top: 4px;">Teleport</button>
+            <button id="btn-teleport" style="width: auto; padding: 8px 10px; margin-top: 4px;">Find</button>
+            <button id="btn-random" style="width: auto; padding: 8px 10px; margin-top: 4px;">Random position</button>
         </div>
 
         <hr style="border-color: #444; margin: 10px 0;">
@@ -879,22 +880,19 @@
                     const foundNode = nodesArray.find(node => canonicalize(node.representation) === canonicalTarget);
                     if (foundNode) {
                         selectNode(foundNode);
-                        camera.position.set(foundNode.x, -foundNode.y, -foundNode.z + 1000);
-                        tracedPathNodeIds = [foundNode.id];
-                        highlightPath(null);
                     } else {
                         alert("A node with that position was not found in the graph.");
                     }
                 });
+                document.getElementById('btn-random').addEventListener('click', () => {
+                    if (!nodesArray || nodesArray.length === 0) return;
 
-                document.getElementById('btnFindRemote').addEventListener('click', () => {
-                    let maxDist = -Infinity;
-                    for (const node of nodesArray) {
-                        if (node.dist > maxDist) maxDist = node.dist;
+                    const randomIndex = Math.floor(Math.random() * nodesArray.length);
+                    const randomNode = nodesArray[randomIndex];
+
+                    if (randomNode) {
+                        selectNode(randomNode);
                     }
-                    const remoteNodes = nodesArray.filter(node => node.dist === maxDist);
-                    alert(`Found ${remoteNodes.length} nodes at max 'Start Distance' of ${maxDist}. Highlighting first one.`);
-                    if (remoteNodes.length > 0) selectNode(remoteNodes[0]);
                 });
 
                 document.getElementById('btnFindPath').addEventListener('click', () => {
