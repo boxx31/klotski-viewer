@@ -182,6 +182,7 @@
             <input type="text" id="teleport-input" placeholder="Enter 20-char position..." style="width: 170px; background: #333; color: #fff; border: 1px solid #555; font-family: monospace; font-size: 0.9em; padding: 4px; box-sizing: border-box;">
             <button id="btnTeleport" style="width: auto; padding: 8px 10px; margin-top: 4px;">Find</button>
             <button id="btnRandom" style="width: auto; padding: 8px 10px; margin-top: 4px;">Random position</button>
+            <button id="btnSetStartNode" style="width: auto; padding: 8px 10px;">Recolor from Current</button>
         </div>
 
         <hr style="border-color: #444; margin: 10px 0;">
@@ -654,6 +655,85 @@
         }
 
         /**
+         * Runs a BFS from a single node to all other reachable nodes.
+         * @param {string} startNodeId - The ID of the node to start from.
+         * @returns {Map<string, number>} A Map where keys are node IDs and values are the distance.
+         */
+        function runBFS_OneToAll(startNodeId) {
+            if (!graphData) return new Map();
+            
+            const distances = new Map(); // [nodeId, distance]
+            const queue = []; // [nodeId, distance]
+            
+            // Add the start node to the queue
+            queue.push([startNodeId, 0]);
+            distances.set(startNodeId, 0);
+            
+            let head = 0; 
+            
+            while (head < queue.length) {
+                const [currentId, distance] = queue[head++];
+                const currentNode = graphData[currentId];
+                if (!currentNode) continue; 
+
+                // Add all unvisited neighbors to the queue
+                for (const neighborId of new Set(currentNode.neighbors)) {
+                    if (!distances.has(neighborId)) { // If not visited
+                        distances.set(neighborId, distance + 1);
+                        queue.push([neighborId, distance + 1]);
+                    }
+                }
+            }
+            
+            return distances; // Map of all reachable node distances
+        }
+
+        /**
+         * Applies a new set of distances to all nodes and rebuilds the color buffer.
+         * @param {Map<string, number>} distances - The map from runBFS_OneToAll.
+         */
+        function applyNewDistances(distances) {
+            if (!nodesArray || !colorAttributes.dist) return;
+
+            console.time("Applying new distances");
+            let newMaxDist = 0;
+            const newNodeColorsByDist = [];
+
+            // Pass 1: Update .dist property on all nodes and find new max distance
+            for (const node of nodesArray) {
+                // Get new distance, default to Infinity if unreachable
+                const newDist = distances.get(node.id) ?? Infinity;
+                node.dist = newDist;
+                
+                if (newDist !== Infinity && newDist > newMaxDist) {
+                    newMaxDist = newDist;
+                }
+            }
+
+            console.log("New Max 'Start Distance':", newMaxDist);
+
+            // Pass 2: Rebuild the color array using the new distances
+            for (const node of nodesArray) {
+                const distColor = mapValueToColor(node.dist, 0, newMaxDist);
+                newNodeColorsByDist.push(distColor.r, distColor.g, distColor.b);
+            }
+
+            // Pass 3: Update the Three.js geometry
+            colorAttributes.dist = new THREE.Float32BufferAttribute(newNodeColorsByDist, 3);
+            
+            // If we are currently in "Start Distance" mode, apply the new colors
+            if (activeColorAttributeName === 'dist') {
+                nodeGeometry.setAttribute('color', colorAttributes.dist);
+                nodeGeometry.attributes.color.needsUpdate = true;
+            }
+
+            // Refresh the info label if a node is selected
+            updateNodeInfoLabel();
+            
+            console.timeEnd("Applying new distances");
+        }
+
+        /**
          * Reconstructs the shortest path to a solution node using pre-calculated 'solution_dist'.
          * @param {object} startNode - The node object to start from.
          * @returns {string[]|null} The path as an array of node IDs, or null.
@@ -826,6 +906,25 @@
                         } else {
                             camera.position.z = 5;
                         }
+
+                        // Run initial distance finder
+                        console.log("Finding initial start node...");
+                        const initialStartRep = "abbcabbceddhefghi..j";
+                        const canonicalStartRep = canonicalize(initialStartRep);
+                        
+                        const initialStartNode = nodesArray.find(n => 
+                            canonicalize(n.representation) === canonicalStartRep
+                        );
+
+                        if (initialStartNode) {
+                            console.log("Found initial start node, running BFS...");
+                            const distances = runBFS_OneToAll(initialStartNode.id);
+                            applyNewDistances(distances);
+                            console.log("Initial 'Start Distances' recalculated.");
+                        } else {
+                            console.warn("Could not find the specified initial start node!");
+                            alert("Warning: Could not find the default start node 'abbcabbceddhefghi..j'. The original 'dist' values from the JSON will be used.");
+                        }
                         
                         // Attach all button listeners
                         const btnOff = document.getElementById('btnOff');
@@ -889,6 +988,25 @@
                             if (randomNode) {
                                 selectNode(randomNode);
                             }
+                        });
+
+                        document.getElementById('btnSetStartNode').addEventListener('click', () => {
+                            if (!highlightedNodeData) {
+                                alert("Please select a node first by Ctrl+Clicking it.");
+                                return;
+                            }
+
+                            const startNodeId = highlightedNodeData.id;
+                            alert("Recalculating all 'Start Distances' from this node...");
+
+                            setTimeout(() => {
+                                console.time("One-to-All BFS");
+                                const distances = runBFS_OneToAll(startNodeId);
+                                console.timeEnd("One-to-All BFS");
+                                
+                                applyNewDistances(distances);
+                                alert("Recalculation complete!");
+                            }, 10);
                         });
                         
                         document.getElementById('btnSetPathStart').addEventListener('click', () => {
