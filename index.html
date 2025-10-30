@@ -72,7 +72,8 @@
             background-color: rgba(0,0,0,0.5);
             padding: 10px;
             border-radius: 8px;
-            min-width: 180px;
+            min-width: 220px;
+            font-size: 0.9em;
         }
         #controls label {
             display: block;
@@ -98,12 +99,12 @@
             background-color: #333;
             color: #fff;
             border: 1px solid #555;
-            padding: 8px 12px;
-            margin: 4px;
+            padding: 8px 10px;
+            margin: 2px;
             cursor: pointer;
             border-radius: 4px;
             transition: background-color 0.2s;
-            width: 80px;
+            width: auto;
             box-sizing: border-box;
         }
         #controls button:hover {
@@ -170,7 +171,7 @@
         <hr>
     
         <!-- FLIGHT SPEED -->
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+        <div style="display: flex; align-items: center; margin-bottom: 10px;">
             <label for="speedSlider" style="margin-right: 10px; font-weight: bold;">Flight Speed:</label>
             <input type="range" id="speedSlider" min="50" max="5000" value="5000" step="50" style="width: 100px;">
             <span id="speedValue" style="width: 35px; text-align: right;">5000</span>
@@ -178,19 +179,21 @@
 
         <!-- NODE COLOR -->
         <div style="display: flex; align-items: center; margin-top: 5px;">
-            <label for="speedSlider" style="margin-right: 30px; font-weight: bold;">Node Color:</label>
-            <button id="btnOff" class="active">None</button>
-            <button id="btnDist">Start</button>
-            <button id="btnSolutionDist">Solution</button>
+            <label for="speedSlider" style="margin-right: 10px; font-weight: bold; white-space: nowrap;">Node Color:</label>
+            <div style="display: flex;">
+                <button id="btnOff" class="active">None</button>
+                <button id="btnDist">Start</button>
+                <button id="btnSolutionDist">Solution</button>
+            </div>
         </div>
 
         <hr>
 
         <!-- POSITION -->
         <strong>Position:</strong><br>
-        <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 5px;">
             <input type="text" id="current-pos-input" readonly title="Current selected position" style="margin-top: 5px;">
-            <button id="btnSetStartNode" style="width: auto;" title="Recalculate all 'Start Distances' from the currently selected node">Set as Start</button>
+            <button id="btnSetStartNode" style="white-space: nowrap; width: auto;" title="Recalculate all 'Start Distances' from the currently selected node">Set as Start</button>
         </div>
         
         <div style="display: flex; align-items: center; margin-top: 8px;">
@@ -202,11 +205,11 @@
         <hr>
 
         <!-- HIGHLIGHT PATH -->
-        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
             <strong>Highlighted Path:</strong>
             <div style="display: flex; align-items: center;">
                 <input type="checkbox" id="traceToggle" checked style="margin-right: 8px;">
-                <label for="traceToggle" style="user-select: none; cursor: pointer;">Trace</label>
+                <label for="traceToggle" style="user-select: none; cursor: pointer; white-space: nowrap;">Trace</label>
             </div>
         </div>
 
@@ -214,11 +217,11 @@
             Start: (None)<br>End: (None)
         </div>
         
-        <div>
-            <button id="btnSetPathStart" title="Set highlighted node as path Start">Set Start</button>
-            <button id="btnSetPathEnd" title="Set highlighted node as path End">Set End</button>
-            <button id="btnCalcPath" title="Find shortest path between Start and End">Find Path</button>
-            <button id="btnFindSolutionPath" title="Find shortest path from highlighted node to a solution">Solution Path</button>
+        <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+            <button id="btnSetPathStart" title="Set highlighted node as path Start" style="white-space: nowrap;">Set Start</button>
+            <button id="btnSetPathEnd" title="Set highlighted node as path End" style="white-space: nowrap;">Set End</button>
+            <button id="btnCalcPath" title="Find shortest path between Start and End" style="white-space: nowrap;">Find Path</button>
+            <button id="btnFindSolutionPath" title="Find shortest path from highlighted node to a solution" style="white-space: nowrap;">Solution Path</button>
         </div>
         
     </div>
