@@ -180,8 +180,8 @@
         
         <div style="margin-top: 8px;">
             <input type="text" id="teleport-input" placeholder="Enter 20-char position..." style="width: 170px; background: #333; color: #fff; border: 1px solid #555; font-family: monospace; font-size: 0.9em; padding: 4px; box-sizing: border-box;">
-            <button id="btn-teleport" style="width: auto; padding: 8px 10px; margin-top: 4px;">Find</button>
-            <button id="btn-random" style="width: auto; padding: 8px 10px; margin-top: 4px;">Random position</button>
+            <button id="btnTeleport" style="width: auto; padding: 8px 10px; margin-top: 4px;">Find</button>
+            <button id="btnRandom" style="width: auto; padding: 8px 10px; margin-top: 4px;">Random position</button>
         </div>
 
         <hr style="border-color: #444; margin: 10px 0;">
@@ -195,7 +195,7 @@
         </div>
         <button id="btnSetPathStart" style="width: auto; padding: 8px 10px;">Set Highlighted as Start</button>
         <button id="btnSetPathEnd" style="width: auto; padding: 8px 10px;">Set Highlighted as End</button>
-        <button id="btnCalcPath" style="width: auto; padding: 8px 10px;">Find Path</button>
+        <button id="btnFindPath" style="width: auto; padding: 8px 10px;">Find Path</button>
         <button id="btnFindSolutionPath" style="width: auto; padding: 8px 10px;">Find Path to Solution</button>
 
         
@@ -867,7 +867,7 @@
                             speedValueEl.textContent = moveSpeed;
                         });
                         
-                        document.getElementById('btn-teleport').addEventListener('click', () => {
+                        document.getElementById('btnTeleport').addEventListener('click', () => {
                             const targetRep = teleportInputEl.value;
                             if (targetRep.length !== 20) {
                                 alert("Invalid position string. Must be 20 characters long."); return;
@@ -880,7 +880,7 @@
                                 alert("A node with that position was not found in the graph.");
                             }
                         });
-                        document.getElementById('btn-random').addEventListener('click', () => {
+                        document.getElementById('btnRandom').addEventListener('click', () => {
                             if (!nodesArray || nodesArray.length === 0) return;
 
                             const randomIndex = Math.floor(Math.random() * nodesArray.length);
