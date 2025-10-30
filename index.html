@@ -280,7 +280,7 @@
         let pathHighlightMesh = null;
 
         // --- Klotski Game State ---
-        let graphData = null; // To store the full loaded graph
+        let graphData = null; // Stores full loaded graph
         let currentBoard = []; // 20-char array of the current board state
         let selectedCellIndex = -1; // Index (0-19) of the first cell clicked
         let highlightedNodeData = null; // The full data object for the selected node
@@ -291,7 +291,7 @@
             'e': '#6A5ACD', 'f': '#DAA520', 'g': '#20B2AA', 'h': '#FF69B4', 'i': '#8A2BE2', 'j': '#A52A2A'
         };
 
-        // --- Helper: Color Scale Helper Function ---
+        // --- Color Scale Helper Function ---
         function mapValueToColor(value, min, max) {
             const color = new THREE.Color();
             if (min === max) { color.setHSL(0.66, 1.0, 0.5); return color; }
@@ -340,7 +340,6 @@
                 return;
             }
 
-            // Check the active mode and update text content
             if (activeColorAttributeName === 'dist') {
                 nodeInfoEl.style.display = 'block';
                 nodeInfoEl.textContent = `Start Dist: ${highlightedNodeData.dist}`;
@@ -348,7 +347,6 @@
                 nodeInfoEl.style.display = 'block';
                 nodeInfoEl.textContent = `Solution Dist: ${highlightedNodeData.solution_dist}`;
             } else {
-                // Hide in 'Default' mode
                 nodeInfoEl.style.display = 'none'; 
             }
         }
@@ -399,11 +397,9 @@
                 
                 if (nodeData) {
                     selectNode(nodeData);
-                    // Path tracing logic removed from here
                 }
             } else {
                 selectNode(null); 
-                // Path tracing logic removed from here
             }
         }
         window.addEventListener('mousedown', onMouseDown, false);
@@ -422,7 +418,7 @@
          * @param {Set<string>} pieceTypeSet - The set of pieces to canonicalize (e.g., PIECE_TYPE_1x1).
          */
         function sortPiecesInArray(repArray, pieceTypeSet) {
-            // 1. Find and sort all pieces of this type
+            // Find and sort all pieces of this type
             const pieces = repArray
                 .filter(char => pieceTypeSet.has(char))
                 .sort();
@@ -431,7 +427,7 @@
                 return; // No pieces of this type, do nothing
             }
 
-            // 2. Re-iterate over the array, replacing pieces in sorted order
+            // Re-iterate over the array, replacing pieces in sorted order
             let pieceIndex = 0;
             for (let i = 0; i < repArray.length; i++) {
                 if (pieceTypeSet.has(repArray[i])) {
@@ -541,7 +537,6 @@
 
         /**
          * Tries to move a piece, returns new board state if successful.
-         * (This function is unchanged but must be present)
          */
         function attemptMove(pieceChar, dx, dy) {
             const board = [...currentBoard]; // Create a copy
@@ -587,7 +582,6 @@
 
         /**
          * Finds a neighbor by its *canonical* representation.
-         * (This function is unchanged but must be present)
          */
         function findNeighborByRep(representation) {
             if (!highlightedNodeData || !graphData) return null;
@@ -617,8 +611,7 @@
             if (!graphData) return null;
             
             const queue = []; // Use array as a queue: [nodeId]
-            // Use a Map to store predecessors (to rebuild the path)
-            const predecessors = new Map();
+            const predecessors = new Map(); // Map to store predecessors (to rebuild the path)
 
             queue.push(startNodeId);
             predecessors.set(startNodeId, null); // Mark start node
@@ -628,7 +621,7 @@
             while (head < queue.length) {
                 const currentId = queue[head++];
                 
-                // 1. Check if we found the target
+                // Check if we found the target
                 if (currentId === endNodeId) {
                     // Reconstruct path
                     const path = [];
@@ -643,20 +636,20 @@
                 const currentNode = graphData[currentId];
                 if (!currentNode) continue; 
 
-                // 3. Add all unvisited neighbors to the queue
+                // Add all unvisited neighbors to the queue
                 for (const neighborId of new Set(currentNode.neighbors)) {
                     if (!predecessors.has(neighborId)) { // If not visited
-                        predecessors.set(neighborId, currentId); // Store parent
+                        predecessors.set(neighborId, currentId);
                         queue.push(neighborId);
                     }
                 }
             }
             
-            return null; // No path found
+            return null;
         }
 
         /**
-         * NEW: Reconstructs the shortest path to a solution node using pre-calculated 'solution_dist'.
+         * Reconstructs the shortest path to a solution node using pre-calculated 'solution_dist'.
          * @param {object} startNode - The node object to start from.
          * @returns {string[]|null} The path as an array of node IDs, or null.
          */
@@ -682,12 +675,11 @@
                         currentNode = neighborNode;
                         currentDist = neighborNode.solution_dist;
                         foundNextStep = true;
-                        break; // Move to the next step in the path
+                        break;
                     }
                 }
                 
                 if (!foundNextStep) {
-                    // This should not happen if the graph data is correct
                     console.error("Could not find next step in solution path. Graph inconsistent.");
                     return null;
                 }
@@ -723,7 +715,7 @@
             
             // Update the geometry
             pathHighlightMesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            pathHighlightMesh.geometry.computeBoundingSphere(); // Important update
+            pathHighlightMesh.geometry.computeBoundingSphere();
         }
 
         window.addEventListener('resize', () => {
@@ -734,17 +726,16 @@
 
         async function loadData() {
             try {
-                // 1. Fetch the graph data. Assumes "data.json" is in the same folder.
+                // Fetch the graph data. Assumes "data.json" is in the same folder.
                 const response = await fetch('./data.json');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status} - Did you name your file 'data.json'?`);
                 }
                 const data = await response.json();
                 
-                // 2. Assign to global variable
                 graphData = data;
                 
-                // 3. Run all setup code that depends on the data
+                // Run all setup code that depends on the data
                 console.time('Graph Processing');
                 const nodePositions = [];
                 const edgePositions = [];
@@ -791,7 +782,7 @@
                 }
                 console.timeEnd('Graph Processing');
                 
-                // 4. Create Geometry
+                // Create Geometry
                 console.time('Geometry Creation');
                 nodeGeometry = new THREE.BufferGeometry(); 
                 nodeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nodePositions, 3));
@@ -816,14 +807,14 @@
                 scene.add(pathHighlightMesh);
                 console.timeEnd('Geometry Creation');
 
-                // 5. Get all UI elements
+                // Get all UI elements
                 highlightRingEl = document.getElementById('highlight-ring');
                 nodeInfoEl = document.getElementById('node-info');
                 pathInfoEl = document.getElementById('path-info');
                 currentPosEl = document.getElementById('current-pos-input');
                 teleportInputEl = document.getElementById('teleport-input');
                 
-                // 6. Position Camera
+                // Position Camera
                 const firstNode = data[Object.keys(data)[0]];
                 if (firstNode) {
                     camera.position.set(firstNode.x, -firstNode.y, -firstNode.z + 5000); 
@@ -831,7 +822,7 @@
                     camera.position.z = 5;
                 }
                 
-                // 7. Attach ALL button listeners
+                // Attach all button listeners
                 const btnOff = document.getElementById('btnOff');
                 const btnDist = document.getElementById('btnDist');
                 const btnSolutionDist = document.getElementById('btnSolutionDist');
