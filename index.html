@@ -10,6 +10,10 @@
         body { background-color: #111; color: #fff; font-family: sans-serif; }
         canvas { display: block; }
         
+        hr {
+            border-color: #444;
+            margin: 10px 0;
+        }
         #highlight-ring {
             position: absolute;
             width: 20px;  
@@ -160,44 +164,62 @@
     </div>
 
     <div id="controls">
+
         <label for="fileInput">Choose a JSON file:</label>
         <input type="file" id="fileInput" accept=".json">
-        <hr style="border-color: #444; margin: 10px 0;">
-
-        <label for="speedSlider">Flight Speed:</label>
-        <input type="range" id="speedSlider" min="50" max="5000" value="5000" step="50">
-        <span id="speedValue">5000</span>
-        <hr style="border-color: #444; margin: 10px 0;">
-        
-        <strong>Node Color:</strong><br>
-        <button id="btnOff" class="active">Default</button>
-        <button id="btnDist">Start</button>
-        <button id="btnSolutionDist">Solution</button>
-
-        <hr style="border-color: #444; margin: 10px 0;">
-        <strong>Position:</strong>
-        <input type="text" id="current-pos-input" readonly style="width: 170px; background: #222; color: #ccc; border: 1px solid #555; font-family: monospace; font-size: 0.9em; padding: 4px; box-sizing: border-box; margin-top: 5px;">
-        
-        <div style="margin-top: 8px;">
-            <input type="text" id="teleport-input" placeholder="Enter 20-char position..." style="width: 170px; background: #333; color: #fff; border: 1px solid #555; font-family: monospace; font-size: 0.9em; padding: 4px; box-sizing: border-box;">
-            <button id="btnTeleport" style="width: auto; padding: 8px 10px; margin-top: 4px;">Find</button>
-            <button id="btnRandom" style="width: auto; padding: 8px 10px; margin-top: 4px;">Random position</button>
-            <button id="btnSetStartNode" style="width: auto; padding: 8px 10px;">Set Highlighted as Start</button>
+        <hr>
+    
+        <!-- FLIGHT SPEED -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <label for="speedSlider" style="margin-right: 10px; font-weight: bold;">Flight Speed:</label>
+            <input type="range" id="speedSlider" min="50" max="5000" value="5000" step="50" style="width: 100px;">
+            <span id="speedValue" style="width: 35px; text-align: right;">5000</span>
         </div>
 
-        <hr style="border-color: #444; margin: 10px 0;">
-        <strong>Shortest Path:</strong>
-        <div style="margin-bottom: 5px;">
-            <input type="checkbox" id="traceToggle" checked>
-            <label for="traceToggle" style="font-size: 0.9em; user-select: none; cursor: pointer;">Trace Path on Board</label>
+        <!-- NODE COLOR -->
+        <div style="display: flex; align-items: center; margin-top: 5px;">
+            <label for="speedSlider" style="margin-right: 30px; font-weight: bold;">Node Color:</label>
+            <button id="btnOff" class="active">None</button>
+            <button id="btnDist">Start</button>
+            <button id="btnSolutionDist">Solution</button>
         </div>
-        <div id="path-info" style="font-family: monospace; margin: 5px 0; min-height: 40px; background: #222; padding: 5px; border-radius: 4px;">
+
+        <hr>
+
+        <!-- POSITION -->
+        <strong>Position:</strong><br>
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <input type="text" id="current-pos-input" readonly title="Current selected position" style="margin-top: 5px;">
+            <button id="btnSetStartNode" style="width: auto;" title="Recalculate all 'Start Distances' from the currently selected node">Set as Start</button>
+        </div>
+        
+        <div style="display: flex; align-items: center; margin-top: 8px;">
+            <input type="text" id="teleport-input" placeholder="Enter 20-char position..." title="Enter 20-char position and press Teleport" style="width: 100%; margin-right: 5px;">
+            <button id="btnTeleport" title="Teleport to the specified position">Teleport</button>
+            <button id="btnRandom" title="Teleport to a random node">Random</button>
+        </div>
+
+        <hr>
+
+        <!-- HIGHLIGHT PATH -->
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <strong>Highlighted Path:</strong>
+            <div style="display: flex; align-items: center;">
+                <input type="checkbox" id="traceToggle" checked style="margin-right: 8px;">
+                <label for="traceToggle" style="user-select: none; cursor: pointer;">Trace</label>
+            </div>
+        </div>
+
+        <div id="path-info" title="Node-to-node path info" style="font-family: monospace; margin: 5px 0; min-height: 40px; background: #222; padding: 5px; border-radius: 4px;">
             Start: (None)<br>End: (None)
         </div>
-        <button id="btnSetPathStart" style="width: auto; padding: 8px 10px;">Set Highlighted as Beginning</button>
-        <button id="btnSetPathEnd" style="width: auto; padding: 8px 10px;">Set Highlighted as End</button>
-        <button id="btnCalcPath" style="width: auto; padding: 8px 10px;">Find Path</button>
-        <button id="btnFindSolutionPath" style="width: auto; padding: 8px 10px;">Find Path to Solution</button>
+        
+        <div>
+            <button id="btnSetPathStart" title="Set highlighted node as path Start">Set Start</button>
+            <button id="btnSetPathEnd" title="Set highlighted node as path End">Set End</button>
+            <button id="btnCalcPath" title="Find shortest path between Start and End">Find Path</button>
+            <button id="btnFindSolutionPath" title="Find shortest path from highlighted node to a solution">Solution Path</button>
+        </div>
         
     </div>
     
