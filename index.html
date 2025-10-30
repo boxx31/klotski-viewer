@@ -195,7 +195,7 @@
         </div>
         <button id="btnSetPathStart" style="width: auto; padding: 8px 10px;">Set Highlighted as Start</button>
         <button id="btnSetPathEnd" style="width: auto; padding: 8px 10px;">Set Highlighted as End</button>
-        <button id="btnFindPath" style="width: auto; padding: 8px 10px;">Find Path</button>
+        <button id="btnCalcPath" style="width: auto; padding: 8px 10px;">Find Path</button>
         <button id="btnFindSolutionPath" style="width: auto; padding: 8px 10px;">Find Path to Solution</button>
 
         
@@ -888,16 +888,6 @@
 
                             if (randomNode) {
                                 selectNode(randomNode);
-                            }
-                        });
-
-                        document.getElementById('btnFindPath').addEventListener('click', () => {
-                            const startNode = nodesArray.find(node => node.dist === 0);
-                            if (startNode) {
-                                alert(`Shortest path between Start and Solution is ${startNode.solution_dist} moves. Highlighting Start.`);
-                                selectNode(startNode);
-                            } else {
-                                alert("Could not find the Start node (dist: 0).");
                             }
                         });
                         
