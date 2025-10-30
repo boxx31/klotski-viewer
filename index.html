@@ -908,7 +908,6 @@
                         }
 
                         // Run initial distance finder
-                        console.log("Finding initial start node...");
                         const initialStartRep = "abbcabbceddhefghi..j";
                         const canonicalStartRep = canonicalize(initialStartRep);
                         
@@ -917,10 +916,8 @@
                         );
 
                         if (initialStartNode) {
-                            console.log("Found initial start node, running BFS...");
                             const distances = runBFS_OneToAll(initialStartNode.id);
                             applyNewDistances(distances);
-                            console.log("Initial 'Start Distances' recalculated.");
                         } else {
                             console.warn("Could not find the specified initial start node!");
                             alert("Warning: Could not find the default start node 'abbcabbceddhefghi..j'. The original 'dist' values from the JSON will be used.");
@@ -997,7 +994,6 @@
                             }
 
                             const startNodeId = highlightedNodeData.id;
-                            alert("Recalculating all 'Start Distances' from this node...");
 
                             setTimeout(() => {
                                 console.time("One-to-All BFS");
@@ -1005,7 +1001,6 @@
                                 console.timeEnd("One-to-All BFS");
                                 
                                 applyNewDistances(distances);
-                                alert("Recalculation complete!");
                             }, 10);
                         });
                         
