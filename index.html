@@ -830,271 +830,273 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        async function loadData() {
-            try {
-                // Fetch the graph data. Assumes "data.json" is in the same folder.
-                const response = await fetch('./data.json');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status} - Did you name your file 'data.json'?`);
-                }
-                const data = await response.json();
+        document.getElementById('fileInput').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const jsonString = e.target.result;
+                        const data = JSON.parse(jsonString);
                 
-                graphData = data;
-                
-                // Run all setup code that depends on the data
-                console.time('Graph Processing');
-                const nodePositions = [];
-                const edgePositions = [];
-                const nodeColorsDefault = [];
-                const nodeColorsByDist = [];
-                const nodeColorsBySolutionDist = [];
-                const nodeMap = new Map();
-                nodesArray = []; 
-                let minDist = Infinity, maxDist = -Infinity, minSolDist = Infinity, maxSolDist = -Infinity;
-
-                // First pass (rotate graph, find min/max)
-                for (const nodeId in data) {
-                    const node = data[nodeId];
-                    node.id = nodeId; 
-                    nodeMap.set(nodeId, new THREE.Vector3(node.x, -node.y, -node.z));
-                    nodesArray.push(node); 
-                    if (node.dist < minDist) minDist = node.dist;
-                    if (node.dist > maxDist) maxDist = node.dist;
-                    if (node.solution_dist < minSolDist) minSolDist = node.solution_dist;
-                    if (node.solution_dist > maxSolDist) maxSolDist = node.solution_dist;
-                }
-
-                // Second pass (build color/position arrays)
-                const defaultColor = new THREE.Color(0x00aaff);
-                for (const node of nodesArray) {
-                    nodePositions.push(node.x, -node.y, -node.z);
-                    nodeColorsDefault.push(defaultColor.r, defaultColor.g, defaultColor.b);
-                    const distColor = mapValueToColor(node.dist, minDist, maxDist);
-                    nodeColorsByDist.push(distColor.r, distColor.g, distColor.b);
-                    const solDistColor = mapValueToColor(node.solution_dist, minSolDist, maxSolDist);
-                    nodeColorsBySolutionDist.push(solDistColor.r, solDistColor.g, solDistColor.b);
-                }
-
-                // Third pass (build edge array)
-                for (const nodeId in data) {
-                    const sourcePos = nodeMap.get(nodeId); 
-                    for (const neighborId of data[nodeId].neighbors) {
-                        const targetPos = nodeMap.get(neighborId);
-                        if (sourcePos && targetPos) {
-                            edgePositions.push(sourcePos.x, sourcePos.y, sourcePos.z);
-                            edgePositions.push(targetPos.x, targetPos.y, targetPos.z);
-                        }
-                    }
-                }
-                console.timeEnd('Graph Processing');
-                
-                // Create Geometry
-                console.time('Geometry Creation');
-                nodeGeometry = new THREE.BufferGeometry(); 
-                nodeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nodePositions, 3));
-                colorAttributes.default = new THREE.Float32BufferAttribute(nodeColorsDefault, 3);
-                colorAttributes.dist = new THREE.Float32BufferAttribute(nodeColorsByDist, 3);
-                colorAttributes.solution = new THREE.Float32BufferAttribute(nodeColorsBySolutionDist, 3);
-                nodeGeometry.setAttribute('color', colorAttributes.default);
-                const nodeMaterial = new THREE.PointsMaterial({ vertexColors: true, size: 4, sizeAttenuation: true });
-                nodes = new THREE.Points(nodeGeometry, nodeMaterial); 
-                scene.add(nodes);
-
-                const edgeGeometry = new THREE.BufferGeometry();
-                edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
-                const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 });
-                const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
-                scene.add(edges);
-                
-                const pathGeo = new THREE.BufferGeometry();
-                const pathMat = new THREE.LineBasicMaterial({ color: 0xFF00FF, transparent: true, opacity: 0.8, depthTest: false });
-                pathHighlightMesh = new THREE.LineSegments(pathGeo, pathMat);
-                pathHighlightMesh.renderOrder = 998;
-                scene.add(pathHighlightMesh);
-                console.timeEnd('Geometry Creation');
-
-                // Get all UI elements
-                highlightRingEl = document.getElementById('highlight-ring');
-                nodeInfoEl = document.getElementById('node-info');
-                pathInfoEl = document.getElementById('path-info');
-                currentPosEl = document.getElementById('current-pos-input');
-                teleportInputEl = document.getElementById('teleport-input');
-                
-                // Position Camera
-                const firstNode = data[Object.keys(data)[0]];
-                if (firstNode) {
-                    camera.position.set(firstNode.x, -firstNode.y, -firstNode.z + 5000); 
-                } else {
-                    camera.position.z = 5;
-                }
-
-                // Select initial node
-                const canonicalStartRep = canonicalize(initialPosition);
-                const initialStartNode = nodesArray.find(n => 
-                    canonicalize(n.representation) === canonicalStartRep
-                );
-
-                if (initialStartNode) {
-                    const distances = runBFS_OneToAll(initialStartNode.id);
-                    applyNewDistances(distances);
-                    selectNode(initialStartNode);
-                } else {
-                    console.warn("Could not find the specified initial start node!");
-                    alert("Warning: Could not find the default start node 'abbcabbceddhefghi..j'. The original 'dist' values from the JSON will be used.");
-                }
-                
-                // Attach all button listeners
-                const btnOff = document.getElementById('btnOff');
-                const btnDist = document.getElementById('btnDist');
-                const btnSolutionDist = document.getElementById('btnSolutionDist');
-                const buttons = [btnOff, btnDist, btnSolutionDist];
-                function setActiveButton(activeBtn) {
-                    buttons.forEach(btn => btn.classList.remove('active'));
-                    activeBtn.classList.add('active');
-                }
-                btnOff.addEventListener('click', () => { 
-                    nodeGeometry.setAttribute('color', colorAttributes.default);
-                    nodeGeometry.attributes.color.needsUpdate = true; 
-                    activeColorAttributeName = 'default'; 
-                    setActiveButton(btnOff);
-                    updateNodeInfoLabel();
-                });
-                btnDist.addEventListener('click', () => {
-                    nodeGeometry.setAttribute('color', colorAttributes.dist);
-                    nodeGeometry.attributes.color.needsUpdate = true;
-                    activeColorAttributeName = 'dist'; 
-                    setActiveButton(btnDist);
-                    updateNodeInfoLabel();
-                });
-                btnSolutionDist.addEventListener('click', () => {
-                    nodeGeometry.setAttribute('color', colorAttributes.solution);
-                    nodeGeometry.attributes.color.needsUpdate = true;
-                    activeColorAttributeName = 'solution'; 
-                    setActiveButton(btnSolutionDist);
-                    updateNodeInfoLabel();
-                });
-                
-                const speedSlider = document.getElementById('speedSlider');
-                const speedValueEl = document.getElementById('speedValue');
-                moveSpeed = parseFloat(speedSlider.value);
-                speedValueEl.textContent = moveSpeed;
-                speedSlider.addEventListener('input', () => {
-                    moveSpeed = parseFloat(speedSlider.value);
-                    speedValueEl.textContent = moveSpeed;
-                });
-                
-                document.getElementById('btnTeleport').addEventListener('click', () => {
-                    const targetRep = teleportInputEl.value;
-                    if (targetRep.length !== 20) {
-                        alert("Invalid position string. Must be 20 characters long."); return;
-                    }
-                    const canonicalTarget = canonicalize(targetRep);
-                    const foundNode = nodesArray.find(node => canonicalize(node.representation) === canonicalTarget);
-                    if (foundNode) {
-                        selectNode(foundNode);
-                    } else {
-                        alert("A node with that position was not found in the graph.");
-                    }
-                });
-                document.getElementById('btnRandom').addEventListener('click', () => {
-                    if (!nodesArray || nodesArray.length === 0) return;
-
-                    const randomIndex = Math.floor(Math.random() * nodesArray.length);
-                    const randomNode = nodesArray[randomIndex];
-
-                    if (randomNode) {
-                        selectNode(randomNode);
-                    }
-                });
-
-                document.getElementById('btnSetStartNode').addEventListener('click', () => {
-                    if (!highlightedNodeData) {
-                        alert("Please select a node first by Ctrl+Clicking it.");
-                        return;
-                    }
-
-                    const startNodeId = highlightedNodeData.id;
-
-                    setTimeout(() => {
-                        console.time("One-to-All BFS");
-                        const distances = runBFS_OneToAll(startNodeId);
-                        console.timeEnd("One-to-All BFS");
+                        graphData = data;
                         
-                        applyNewDistances(distances);
-                    }, 10);
-                });
-                
-                document.getElementById('btnSetPathStart').addEventListener('click', () => {
-                    if (highlightedNodeData) {
-                        pathStartNode = highlightedNodeData;
-                        updatePathInfoLabel();
-                    } else {
-                        alert("Please select a node first by Ctrl+Clicking it.");
-                    }
-                });
+                        // Run all setup code that depends on the data
+                        console.time('Graph Processing');
+                        const nodePositions = [];
+                        const edgePositions = [];
+                        const nodeColorsDefault = [];
+                        const nodeColorsByDist = [];
+                        const nodeColorsBySolutionDist = [];
+                        const nodeMap = new Map();
+                        nodesArray = []; 
+                        let minDist = Infinity, maxDist = -Infinity, minSolDist = Infinity, maxSolDist = -Infinity;
 
-                document.getElementById('btnSetPathEnd').addEventListener('click', () => {
-                    if (highlightedNodeData) {
-                        pathEndNode = highlightedNodeData;
-                        updatePathInfoLabel();
-                    } else {
-                        alert("Please select a node first by Ctrl+Clicking it.");
-                    }
-                });
-                
-                document.getElementById('btnCalcPath').addEventListener('click', () => {
-                    if (!pathStartNode || !pathEndNode) {
-                        alert("Please set both a Start and an End node first."); return;
-                    }
-                    highlightPath(null);
-                    if (pathStartNode.id === pathEndNode.id) {
-                        alert("Start and End nodes are the same. Distance is 0.");
-                        pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Distance: 0`;
-                        return;
-                    }
-                    pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Calculating...`;
-                    setTimeout(() => {
-                        console.time("BFS Pathfind");
-                        const path = runBFS(pathStartNode.id, pathEndNode.id);
-                        console.timeEnd("BFS Pathfind");
-                        if (path === null) {
-                            pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>No Path Found`;
-                        } else {
-                            const distance = path.length - 1;
-                            pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Distance: ${distance}`;
-                            highlightPath(path);
+                        // First pass (rotate graph, find min/max)
+                        for (const nodeId in data) {
+                            const node = data[nodeId];
+                            node.id = nodeId; 
+                            nodeMap.set(nodeId, new THREE.Vector3(node.x, -node.y, -node.z));
+                            nodesArray.push(node); 
+                            if (node.dist < minDist) minDist = node.dist;
+                            if (node.dist > maxDist) maxDist = node.dist;
+                            if (node.solution_dist < minSolDist) minSolDist = node.solution_dist;
+                            if (node.solution_dist > maxSolDist) maxSolDist = node.solution_dist;
                         }
-                    }, 10);
-                });
-                
-                document.getElementById('btnFindSolutionPath').addEventListener('click', () => {
-                    if (!highlightedNodeData) {
-                        alert("Please select a node first by Ctrl+Clicking it."); return;
-                    }
-                    if (highlightedNodeData.solution_dist === 0) {
-                        alert("This is already a solution node.");
-                        highlightPath(null);
-                        return;
-                    }
-                    highlightPath(null);
-                    console.time("Solution Pathfind");
-                    const path = findSolutionPath(highlightedNodeData);
-                    console.timeEnd("Solution Pathfind");
-                    if (path) {
-                        highlightPath(path);
-                    } else {
-                        alert("Could not reconstruct path to solution.");
-                    }
-                });
 
-                document.getElementById('traceToggle').addEventListener('change', (event) => {
-                    isPathTracerOn = event.target.checked;
-                });
+                        // Second pass (build color/position arrays)
+                        const defaultColor = new THREE.Color(0x00aaff);
+                        for (const node of nodesArray) {
+                            nodePositions.push(node.x, -node.y, -node.z);
+                            nodeColorsDefault.push(defaultColor.r, defaultColor.g, defaultColor.b);
+                            const distColor = mapValueToColor(node.dist, minDist, maxDist);
+                            nodeColorsByDist.push(distColor.r, distColor.g, distColor.b);
+                            const solDistColor = mapValueToColor(node.solution_dist, minSolDist, maxSolDist);
+                            nodeColorsBySolutionDist.push(solDistColor.r, solDistColor.g, solDistColor.b);
+                        }
 
-            } catch (parseErr) { console.error('Error parsing JSON:', parseErr); }
-        };
-        reader.onerror = (err) => { console.error('Error reading file:', err); };
-        reader.readAsText(file);
+                        // Third pass (build edge array)
+                        for (const nodeId in data) {
+                            const sourcePos = nodeMap.get(nodeId); 
+                            for (const neighborId of data[nodeId].neighbors) {
+                                const targetPos = nodeMap.get(neighborId);
+                                if (sourcePos && targetPos) {
+                                    edgePositions.push(sourcePos.x, sourcePos.y, sourcePos.z);
+                                    edgePositions.push(targetPos.x, targetPos.y, targetPos.z);
+                                }
+                            }
+                        }
+                        console.timeEnd('Graph Processing');
+                        
+                        // Create Geometry
+                        console.time('Geometry Creation');
+                        nodeGeometry = new THREE.BufferGeometry(); 
+                        nodeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nodePositions, 3));
+                        colorAttributes.default = new THREE.Float32BufferAttribute(nodeColorsDefault, 3);
+                        colorAttributes.dist = new THREE.Float32BufferAttribute(nodeColorsByDist, 3);
+                        colorAttributes.solution = new THREE.Float32BufferAttribute(nodeColorsBySolutionDist, 3);
+                        nodeGeometry.setAttribute('color', colorAttributes.default);
+                        const nodeMaterial = new THREE.PointsMaterial({ vertexColors: true, size: 4, sizeAttenuation: true });
+                        nodes = new THREE.Points(nodeGeometry, nodeMaterial); 
+                        scene.add(nodes);
+
+                        const edgeGeometry = new THREE.BufferGeometry();
+                        edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
+                        const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 });
+                        const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+                        scene.add(edges);
+                        
+                        const pathGeo = new THREE.BufferGeometry();
+                        const pathMat = new THREE.LineBasicMaterial({ color: 0xFF00FF, transparent: true, opacity: 0.8, depthTest: false });
+                        pathHighlightMesh = new THREE.LineSegments(pathGeo, pathMat);
+                        pathHighlightMesh.renderOrder = 998;
+                        scene.add(pathHighlightMesh);
+                        console.timeEnd('Geometry Creation');
+
+                        // Get all UI elements
+                        highlightRingEl = document.getElementById('highlight-ring');
+                        nodeInfoEl = document.getElementById('node-info');
+                        pathInfoEl = document.getElementById('path-info');
+                        currentPosEl = document.getElementById('current-pos-input');
+                        teleportInputEl = document.getElementById('teleport-input');
+                        
+                        // Position Camera
+                        const firstNode = data[Object.keys(data)[0]];
+                        if (firstNode) {
+                            camera.position.set(firstNode.x, -firstNode.y, -firstNode.z + 5000); 
+                        } else {
+                            camera.position.z = 5;
+                        }
+
+                        // Select initial node
+                        const canonicalStartRep = canonicalize(initialPosition);
+                        const initialStartNode = nodesArray.find(n => 
+                            canonicalize(n.representation) === canonicalStartRep
+                        );
+
+                        if (initialStartNode) {
+                            const distances = runBFS_OneToAll(initialStartNode.id);
+                            applyNewDistances(distances);
+                            selectNode(initialStartNode);
+                        } else {
+                            console.warn("Could not find the specified initial start node!");
+                            alert("Warning: Could not find the default start node 'abbcabbceddhefghi..j'. The original 'dist' values from the JSON will be used.");
+                        }
+                        
+                        // Attach all button listeners
+                        const btnOff = document.getElementById('btnOff');
+                        const btnDist = document.getElementById('btnDist');
+                        const btnSolutionDist = document.getElementById('btnSolutionDist');
+                        const buttons = [btnOff, btnDist, btnSolutionDist];
+                        function setActiveButton(activeBtn) {
+                            buttons.forEach(btn => btn.classList.remove('active'));
+                            activeBtn.classList.add('active');
+                        }
+                        btnOff.addEventListener('click', () => { 
+                            nodeGeometry.setAttribute('color', colorAttributes.default);
+                            nodeGeometry.attributes.color.needsUpdate = true; 
+                            activeColorAttributeName = 'default'; 
+                            setActiveButton(btnOff);
+                            updateNodeInfoLabel();
+                        });
+                        btnDist.addEventListener('click', () => {
+                            nodeGeometry.setAttribute('color', colorAttributes.dist);
+                            nodeGeometry.attributes.color.needsUpdate = true;
+                            activeColorAttributeName = 'dist'; 
+                            setActiveButton(btnDist);
+                            updateNodeInfoLabel();
+                        });
+                        btnSolutionDist.addEventListener('click', () => {
+                            nodeGeometry.setAttribute('color', colorAttributes.solution);
+                            nodeGeometry.attributes.color.needsUpdate = true;
+                            activeColorAttributeName = 'solution'; 
+                            setActiveButton(btnSolutionDist);
+                            updateNodeInfoLabel();
+                        });
+                        
+                        const speedSlider = document.getElementById('speedSlider');
+                        const speedValueEl = document.getElementById('speedValue');
+                        moveSpeed = parseFloat(speedSlider.value);
+                        speedValueEl.textContent = moveSpeed;
+                        speedSlider.addEventListener('input', () => {
+                            moveSpeed = parseFloat(speedSlider.value);
+                            speedValueEl.textContent = moveSpeed;
+                        });
+                        
+                        document.getElementById('btnTeleport').addEventListener('click', () => {
+                            const targetRep = teleportInputEl.value;
+                            if (targetRep.length !== 20) {
+                                alert("Invalid position string. Must be 20 characters long."); return;
+                            }
+                            const canonicalTarget = canonicalize(targetRep);
+                            const foundNode = nodesArray.find(node => canonicalize(node.representation) === canonicalTarget);
+                            if (foundNode) {
+                                selectNode(foundNode);
+                            } else {
+                                alert("A node with that position was not found in the graph.");
+                            }
+                        });
+                        document.getElementById('btnRandom').addEventListener('click', () => {
+                            if (!nodesArray || nodesArray.length === 0) return;
+
+                            const randomIndex = Math.floor(Math.random() * nodesArray.length);
+                            const randomNode = nodesArray[randomIndex];
+
+                            if (randomNode) {
+                                selectNode(randomNode);
+                            }
+                        });
+
+                        document.getElementById('btnSetStartNode').addEventListener('click', () => {
+                            if (!highlightedNodeData) {
+                                alert("Please select a node first by Ctrl+Clicking it.");
+                                return;
+                            }
+
+                            const startNodeId = highlightedNodeData.id;
+
+                            setTimeout(() => {
+                                console.time("One-to-All BFS");
+                                const distances = runBFS_OneToAll(startNodeId);
+                                console.timeEnd("One-to-All BFS");
+                                
+                                applyNewDistances(distances);
+                            }, 10);
+                        });
+                        
+                        document.getElementById('btnSetPathStart').addEventListener('click', () => {
+                            if (highlightedNodeData) {
+                                pathStartNode = highlightedNodeData;
+                                updatePathInfoLabel();
+                            } else {
+                                alert("Please select a node first by Ctrl+Clicking it.");
+                            }
+                        });
+
+                        document.getElementById('btnSetPathEnd').addEventListener('click', () => {
+                            if (highlightedNodeData) {
+                                pathEndNode = highlightedNodeData;
+                                updatePathInfoLabel();
+                            } else {
+                                alert("Please select a node first by Ctrl+Clicking it.");
+                            }
+                        });
+                        
+                        document.getElementById('btnCalcPath').addEventListener('click', () => {
+                            if (!pathStartNode || !pathEndNode) {
+                                alert("Please set both a Start and an End node first."); return;
+                            }
+                            highlightPath(null);
+                            if (pathStartNode.id === pathEndNode.id) {
+                                alert("Start and End nodes are the same. Distance is 0.");
+                                pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Distance: 0`;
+                                return;
+                            }
+                            pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Calculating...`;
+                            setTimeout(() => {
+                                console.time("BFS Pathfind");
+                                const path = runBFS(pathStartNode.id, pathEndNode.id);
+                                console.timeEnd("BFS Pathfind");
+                                if (path === null) {
+                                    pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>No Path Found`;
+                                } else {
+                                    const distance = path.length - 1;
+                                    pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Distance: ${distance}`;
+                                    highlightPath(path);
+                                }
+                            }, 10);
+                        });
+                        
+                        document.getElementById('btnFindSolutionPath').addEventListener('click', () => {
+                            if (!highlightedNodeData) {
+                                alert("Please select a node first by Ctrl+Clicking it."); return;
+                            }
+                            if (highlightedNodeData.solution_dist === 0) {
+                                alert("This is already a solution node.");
+                                highlightPath(null);
+                                return;
+                            }
+                            highlightPath(null);
+                            console.time("Solution Pathfind");
+                            const path = findSolutionPath(highlightedNodeData);
+                            console.timeEnd("Solution Pathfind");
+                            if (path) {
+                                highlightPath(path);
+                            } else {
+                                alert("Could not reconstruct path to solution.");
+                            }
+                        });
+
+                        document.getElementById('traceToggle').addEventListener('change', (event) => {
+                            isPathTracerOn = event.target.checked;
+                        });
+
+                    } catch (parseErr) { console.error('Error parsing JSON:', parseErr); }
+                };
+                reader.onerror = (err) => { console.error('Error reading file:', err); };
+                reader.readAsText(file);
+            }
+        });
         
         // --- Animation Loop ---
         function animate() {
