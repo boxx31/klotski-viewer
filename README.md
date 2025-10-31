@@ -7,5 +7,5 @@ You can:
 - Trace your path on the graph as you play the puzzle
 - Find the optimal route between any two positions
 
-Data and graph based on [original]([original](https://github.com/2swap/Klotski-Webpage)) by 2swap.
+Data and graph based on [original](https://github.com/2swap/Klotski-Webpage) by 2swap.
 Made with assistance from Google Gemini.
