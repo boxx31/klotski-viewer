@@ -170,14 +170,12 @@
         <input type="file" id="fileInput" accept=".json">
         <hr>
     
-        <!-- FLIGHT SPEED -->
         <div style="display: flex; align-items: center; margin-bottom: 10px;">
             <label for="speedSlider" style="margin-right: 10px; font-weight: bold;">Flight Speed:</label>
             <input type="range" id="speedSlider" min="50" max="5000" value="5000" step="50" style="width: 100px;">
             <span id="speedValue" style="width: 35px; text-align: right;">5000</span>
         </div>
 
-        <!-- NODE COLOR -->
         <div style="display: flex; align-items: center; margin-top: 5px;">
             <label for="speedSlider" style="margin-right: 10px; font-weight: bold; white-space: nowrap;">Node Color:</label>
             <div style="display: flex;">
@@ -189,7 +187,6 @@
 
         <hr>
 
-        <!-- POSITION -->
         <strong>Position:</strong><br>
         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 5px;">
             <input type="text" id="current-pos-input" readonly title="Current selected position" style="margin-top: 5px;">
@@ -198,13 +195,12 @@
         
         <div style="display: flex; align-items: center; margin-top: 8px;">
             <input type="text" id="teleport-input" placeholder="Enter 20-char position..." title="Enter 20-char position and press Teleport" style="width: 100%; margin-right: 5px;">
-            <button id="btnTeleport" title="Teleport to the specified position">Teleport</button>
+            <button id="btnTeleport" title="Teleport to the specified position">Find</button>
             <button id="btnRandom" title="Teleport to a random node">Random</button>
         </div>
 
         <hr>
 
-        <!-- HIGHLIGHT PATH -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
             <strong>Highlighted Path:</strong>
             <div style="display: flex; align-items: center;">
@@ -314,6 +310,7 @@
         let currentBoard = []; // 20-char array of the current board state
         let selectedCellIndex = -1; // Index (0-19) of the first cell clicked
         let highlightedNodeData = null; // The full data object for the selected node
+        const initialPosition = "abbcabbceddhefghi..j";
         const klotskiBoardEl = document.getElementById('klotski-board-container');
         const klotskiCells = [];
         const pieceColors = {
@@ -931,10 +928,8 @@
                             camera.position.z = 5;
                         }
 
-                        // Run initial distance finder
-                        const initialStartRep = "abbcabbceddhefghi..j";
-                        const canonicalStartRep = canonicalize(initialStartRep);
-                        
+                        // Select initial node
+                        const canonicalStartRep = canonicalize(initialPosition);
                         const initialStartNode = nodesArray.find(n => 
                             canonicalize(n.representation) === canonicalStartRep
                         );
@@ -942,6 +937,7 @@
                         if (initialStartNode) {
                             const distances = runBFS_OneToAll(initialStartNode.id);
                             applyNewDistances(distances);
+                            selectNode(initialStartNode);
                         } else {
                             console.warn("Could not find the specified initial start node!");
                             alert("Warning: Could not find the default start node 'abbcabbceddhefghi..j'. The original 'dist' values from the JSON will be used.");
