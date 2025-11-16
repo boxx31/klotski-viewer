@@ -59,7 +59,6 @@
         
         /* NEW: Style for the selected piece */
         .klotski-cell.selected {
-            outline: 2px solid magenta;
             outline-offset: -2px;
             box-shadow: inset 0 0 10px rgba(255, 0, 255, 0.5);
         }
@@ -155,13 +154,14 @@
     <div id="node-info"></div>
     
     <div id="instructions">
-        <b>Controls:</b><br>
-        1. Click Screen to lock mouse & fly.<br>
+        <b>Controls (use PC):</b><br>
+        1. <code>Click</code> screen to lock mouse and fly.<br>
         2. Use <code>WASD</code> + <code>Mouse</code> to fly.<br>
-        3. <code>Space</code> = Up, <code>Shift</code> = Down.<br>
-        4. Press <code>ESC</code> to unlock mouse.<br>
-        5. <code>Ctrl+Click</code> a node (while unlocked).<br>
-        6. Click piece + empty spot on board to move.
+        3. <code>Scroll</code> to change speed.<br>
+        4. <code>Space</code> = Up, <code>Shift</code> = Down.<br>
+        5. Press <code>ESC</code> to unlock mouse.<br>
+        6. <code>Ctrl+Click</code> a node (while unlocked).<br>
+        7. Click piece + empty spot on board to move.
     </div>
 
     <div id="controls">
@@ -272,6 +272,7 @@
                 controls.lock();
             }
         });
+        renderer.domElement.addEventListener('wheel', onCanvasWheel, { passive: false });
         
         // --- Core Graph/Interaction Variables ---
         const raycaster = new THREE.Raycaster();
@@ -303,8 +304,10 @@
         // --- Klotski Game State ---
         let graphData = null; // Stores full loaded graph
         let currentBoard = []; // 20-char array of the current board state
-        let selectedCellIndex = -1; // Index (0-19) of the first cell clicked
         let highlightedNodeData = null; // The full data object for the selected node
+        let dragStartCoords = { x: 0, y: 0 };
+        let dragPieceChar = null;
+        let dragMoveDetected = false; // To prevent multiple moves per drag
         const initialPosition = "abbcabbceddhefghi..j";
         const klotskiBoardEl = document.getElementById('klotski-board-container');
         const klotskiCells = [];
@@ -327,11 +330,10 @@
         for (let i = 0; i < 20; i++) {
             const cell = document.createElement('div');
             cell.classList.add('klotski-cell');
-            // NEW: Add click listener for game logic
-            cell.addEventListener('click', () => onKlotskiCellClick(i));
             klotskiBoardEl.appendChild(cell);
             klotskiCells.push(cell);
         }
+        klotskiBoardEl.addEventListener('mousedown', onKlotskiMouseDown);
         
         /**
          * Updates the Klotski board display AND the internal game state.
@@ -350,7 +352,6 @@
                 klotskiCells[i].textContent = char === '.' ? '' : char;
                 klotskiCells[i].classList.remove('selected'); // Clear all selections
             }
-            selectedCellIndex = -1; // Reset selection
         }
         updateKlotskiBoard("...................."); // Initialize
 
@@ -475,64 +476,94 @@
             return repArray.join('');
         }
         
-        /**
-         * Handles a click on the Klotski board grid.
-         */
-        function onKlotskiCellClick(clickedIndex) {
-            if (!highlightedNodeData) return; // Can't play if no node is selected
+        function onCanvasWheel(event) {
+            // Only change speed when in fly mode
+            if (controls.isLocked === true) {
+                event.preventDefault(); // Stop page from scrolling
 
-            const clickedChar = currentBoard[clickedIndex];
+                const speedSlider = document.getElementById('speedSlider');
+                const speedValueEl = document.getElementById('speedValue');
+                if (!speedSlider || !speedValueEl) return;
+
+                const direction = Math.sign(event.deltaY); // -1 for up, +1 for down
+                const currentVal = parseFloat(speedSlider.value);
+                const step = parseFloat(speedSlider.step);
+                const min = parseFloat(speedSlider.min);
+                const max = parseFloat(speedSlider.max);
+
+                // We subtract: scroll up (negative delta) should increase speed
+                let newVal = currentVal - (direction * step * 5); // Multiply by 5 for sensitivity
+                newVal = Math.max(min, Math.min(max, newVal));
+
+                if (newVal !== currentVal) {
+                    speedSlider.value = newVal;
+                    moveSpeed = newVal;
+                    speedValueEl.textContent = newVal;
+                }
+            }
+        }
+
+        function onKlotskiMouseDown(event) {
+            if (!highlightedNodeData) return; // Can't play
+            event.preventDefault();
+
+            // Get index from the clicked cell
+            const clickedIndex = klotskiCells.indexOf(event.target);
+            if (clickedIndex === -1) return; // Clicked grid gap
             
-            if (selectedCellIndex === -1) {
-                // 1. FIRST CLICK: Select a piece
-                if (clickedChar === '.') return; // Can't select an empty space
-                
-                selectedCellIndex = clickedIndex;
-                klotskiCells[clickedIndex].classList.add('selected');
-                
-            } else {
-                // 2. SECOND CLICK: Select a destination
-                
-                if (selectedCellIndex === clickedIndex) {
-                    klotskiCells[clickedIndex].classList.remove('selected');
-                    selectedCellIndex = -1;
-                    return;
-                }
-                
-                if (clickedChar !== '.') {
-                    klotskiCells[selectedCellIndex].classList.remove('selected');
-                    selectedCellIndex = clickedIndex;
-                    klotskiCells[clickedIndex].classList.add('selected');
-                    return;
-                }
-                
-                const pieceChar = currentBoard[selectedCellIndex];
-                const fromX = selectedCellIndex % 4;
-                const fromY = Math.floor(selectedCellIndex / 4);
-                const toX = clickedIndex % 4;
-                const toY = Math.floor(clickedIndex / 4);
-                
-                const dx = toX - fromX;
-                const dy = toY - fromY;
+            const pieceChar = currentBoard[clickedIndex];
+            if (pieceChar === '.') return; // Clicked empty space
 
-                if (Math.abs(dx) + Math.abs(dy) !== 1) {
-                    klotskiCells[selectedCellIndex].classList.remove('selected');
-                    selectedCellIndex = -1;
-                    return;
+            // Highlight all cells of this piece
+            for(let i = 0; i < 20; i++) {
+                if (currentBoard[i] === pieceChar) {
+                    klotskiCells[i].classList.add('selected');
                 }
+            }
 
-                const [moveSuccess, newBoard] = attemptMove(pieceChar, dx, dy);
-                
+            dragPieceChar = pieceChar;
+            dragStartCoords = { x: event.clientX, y: event.clientY };
+            dragMoveDetected = false;
+
+            // Add move/up listeners to the *window* to capture drag
+            window.addEventListener('mousemove', onWindowMouseMove);
+            window.addEventListener('mouseup', onWindowMouseUp);
+        }
+
+        function onWindowMouseMove(event) {
+            if (!dragPieceChar || dragMoveDetected) return;
+            event.preventDefault();
+
+            const dx = event.clientX - dragStartCoords.x;
+            const dy = event.clientY - dragStartCoords.y;
+            
+            const threshold = 30; // Min pixels to move to trigger
+            let moveDirection = null; // [dx, dy] for attemptMove
+
+            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) {
+                // Horizontal move
+                moveDirection = [Math.sign(dx), 0]; // [1, 0] or [-1, 0]
+                dragMoveDetected = true;
+            } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > threshold) {
+                // Vertical move
+                moveDirection = [0, Math.sign(dy)]; // [0, 1] or [0, -1]
+                dragMoveDetected = true;
+            }
+
+            if (moveDirection) {
+                // Try to perform the move
+                const [moveSuccess, newBoard] = attemptMove(dragPieceChar, moveDirection[0], moveDirection[1]);
+
                 if (moveSuccess) {
                     const newRep = newBoard.join('');
-                    const neighborNode = findNeighborByRep(newRep); 
+                    const neighborNode = findNeighborByRep(newRep);
                     
                     if (neighborNode) {
+                        // --- Path Tracer Logic ---
                         if (isPathTracerOn) { 
                             const currentPath = tracedPathNodeIds;
                             const currentNodeId = highlightedNodeData.id;
                             const nextNodeId = neighborNode.id;
-
                             if (currentPath.length === 0) {
                                 tracedPathNodeIds = [currentNodeId, nextNodeId];
                             } else if (currentPath[currentPath.length - 1] === currentNodeId) {
@@ -542,19 +573,29 @@
                             }
                             highlightPath(tracedPathNodeIds);
                         }
-
-                        selectNode(neighborNode); 
-
+                        // --- End Path Tracer ---
+                        
+                        selectNode(neighborNode); // Move to the new node
                     } else {
-                        console.warn("Valid move, but no neighbor found in graph for rep:", newRep);
-                        klotskiCells[selectedCellIndex].classList.remove('selected');
-                        selectedCellIndex = -1;
+                        console.warn("Valid drag move, but no neighbor found for rep:", newRep);
                     }
-                } else {
-                    klotskiCells[selectedCellIndex].classList.remove('selected');
-                    selectedCellIndex = -1;
+                }
+                
+                // Stop the drag immediately after one move is detected (success or fail)
+                onWindowMouseUp(); 
+            }
+        }
+
+        function onWindowMouseUp() {
+            // The move is over, successful or not. Clean up highlights.
+            if (dragPieceChar) {
+                for(let i = 0; i < 20; i++) {
+                    klotskiCells[i].classList.remove('selected');
                 }
             }
+            dragPieceChar = null;
+            window.removeEventListener('mousemove', onWindowMouseMove);
+            window.removeEventListener('mouseup', onWindowMouseUp);
         }
 
         /**
