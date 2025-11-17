@@ -550,6 +550,8 @@
             }
 
             if (moveDirection) {
+                onWindowMouseUp();
+                
                 // Try to perform the move
                 const [moveSuccess, newBoard] = attemptMove(dragPieceChar, moveDirection[0], moveDirection[1]);
 
@@ -558,7 +560,6 @@
                     const neighborNode = findNeighborByRep(newRep);
                     
                     if (neighborNode) {
-                        // --- Path Tracer Logic ---
                         if (isPathTracerOn) { 
                             const currentPath = tracedPathNodeIds;
                             const currentNodeId = highlightedNodeData.id;
@@ -572,7 +573,6 @@
                             }
                             highlightPath(tracedPathNodeIds);
                         }
-                        // --- End Path Tracer ---
                         
                         selectNode(neighborNode); // Move to the new node
                     } else {
