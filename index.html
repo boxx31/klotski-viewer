@@ -155,13 +155,12 @@
     
     <div id="instructions">
         <b>Controls (use PC):</b><br>
-        1. <code>Click</code> screen to lock mouse and fly.<br>
+        1. <code>Click</code> screen to lock mouse. <code>Esc</code> to unlock.<br>
         2. Use <code>WASD</code> + <code>Mouse</code> to fly.<br>
-        3. <code>Scroll</code> to change speed.<br>
-        4. <code>Space</code> = Up, <code>Shift</code> = Down.<br>
-        5. Press <code>ESC</code> to unlock mouse.<br>
-        6. <code>Ctrl+Click</code> a node (while unlocked).<br>
-        7. Click piece + empty spot on board to move.
+        3. <code>Space</code> = Up, <code>Shift</code> = Down.<br>
+        4. <code>Scroll</code> to change speed.<br>
+        5. Drag and drop pieces on board to move.<br>
+        6. <code>Ctrl+Click</code> a node to change board.
     </div>
 
     <div id="controls">
@@ -397,8 +396,8 @@
 
         function updatePathInfoLabel() {
             if (!pathInfoEl) return;
-            const startText = pathStartNode ? pathStartNode.id : "(None)";
-            const endText = pathEndNode ? pathEndNode.id : "(None)";
+            const startText = pathStartNode ? pathStartNode.representation : "(None)";
+            const endText = pathEndNode ? pathEndNode.representation : "(None)";
             pathInfoEl.innerHTML = `Start: ${startText}<br>End: ${endText}`;
         }
 
@@ -1074,59 +1073,59 @@
                             }
                         });
 
-                        document.getElementById('btnSetPathEnd').addEventListener('click', () => {
-                            if (highlightedNodeData) {
-                                pathEndNode = highlightedNodeData;
-                                updatePathInfoLabel();
-                            } else {
-                                alert("Please select a node first by Ctrl+Clicking it.");
-                            }
-                        });
-                        
-                        document.getElementById('btnCalcPath').addEventListener('click', () => {
-                            if (!pathStartNode || !pathEndNode) {
-                                alert("Please set both a Start and an End node first."); return;
-                            }
-                            highlightPath(null);
-                            if (pathStartNode.id === pathEndNode.id) {
-                                alert("Start and End nodes are the same. Distance is 0.");
-                                pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Distance: 0`;
-                                return;
-                            }
-                            pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Calculating...`;
-                            setTimeout(() => {
-                                console.time("BFS Pathfind");
-                                const path = runBFS(pathStartNode.id, pathEndNode.id);
-                                console.timeEnd("BFS Pathfind");
-                                if (path === null) {
-                                    pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>No Path Found`;
-                                } else {
-                                    const distance = path.length - 1;
-                                    pathInfoEl.innerHTML = `Start: ${pathStartNode.id}<br>End: ${pathEndNode.id}<br>Distance: ${distance}`;
-                                    highlightPath(path);
-                                }
-                            }, 10);
-                        });
-                        
-                        document.getElementById('btnFindSolutionPath').addEventListener('click', () => {
-                            if (!highlightedNodeData) {
-                                alert("Please select a node first by Ctrl+Clicking it."); return;
-                            }
-                            if (highlightedNodeData.solution_dist === 0) {
-                                alert("This is already a solution node.");
-                                highlightPath(null);
-                                return;
-                            }
-                            highlightPath(null);
-                            console.time("Solution Pathfind");
-                            const path = findSolutionPath(highlightedNodeData);
-                            console.timeEnd("Solution Pathfind");
-                            if (path) {
-                                highlightPath(path);
-                            } else {
-                                alert("Could not reconstruct path to solution.");
-                            }
-                        });
+                document.getElementById('btnSetPathEnd').addEventListener('click', () => {
+                    if (highlightedNodeData) {
+                        pathEndNode = highlightedNodeData;
+                        updatePathInfoLabel();
+                    } else {
+                        alert("Please select a node first by Ctrl+Clicking it.");
+                    }
+                });
+                
+                document.getElementById('btnCalcPath').addEventListener('click', () => {
+                    if (!pathStartNode || !pathEndNode) {
+                        alert("Please set both a Start and an End node first."); return;
+                    }
+                    highlightPath(null);
+                    if (pathStartNode.id === pathEndNode.id) {
+                        alert("Start and End nodes are the same. Distance is 0.");
+                        pathInfoEl.innerHTML = `Start: ${pathStartNode.representation}<br>End: ${pathEndNode.representation}<br>Distance: 0`;
+                        return;
+                    }
+                    pathInfoEl.innerHTML = `Start: ${pathStartNode.representation}<br>End: ${pathEndNode.representation}<br>Calculating...`;
+                    setTimeout(() => {
+                        console.time("BFS Pathfind");
+                        const path = runBFS(pathStartNode.id, pathEndNode.id);
+                        console.timeEnd("BFS Pathfind");
+                        if (path === null) {
+                            pathInfoEl.innerHTML = `Start: ${pathStartNode.representation}<br>End: ${pathEndNode.representation}<br>No Path Found`;
+                        } else {
+                            const distance = path.length - 1;
+                            pathInfoEl.innerHTML = `Start: ${pathStartNode.representation}<br>End: ${pathEndNode.representation}<br>Distance: ${distance}`;
+                            highlightPath(path);
+                        }
+                    }, 10);
+                });
+                
+                document.getElementById('btnFindSolutionPath').addEventListener('click', () => {
+                    if (!highlightedNodeData) {
+                        alert("Please select a node first by Ctrl+Clicking it."); return;
+                    }
+                    if (highlightedNodeData.solution_dist === 0) {
+                        alert("This is already a solution node.");
+                        highlightPath(null);
+                        return;
+                    }
+                    highlightPath(null);
+                    console.time("Solution Pathfind");
+                    const path = findSolutionPath(highlightedNodeData);
+                    console.timeEnd("Solution Pathfind");
+                    if (path) {
+                        highlightPath(path);
+                    } else {
+                        alert("Could not reconstruct path to solution.");
+                    }
+                });
 
                         document.getElementById('traceToggle').addEventListener('change', (event) => {
                             isPathTracerOn = event.target.checked;
